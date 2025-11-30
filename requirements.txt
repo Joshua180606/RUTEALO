@@ -1,0 +1,5 @@
+pandas
+pypdf
+pymongo
+python-docx
+python-pptx
