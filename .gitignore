@@ -72,4 +72,4 @@ coverage.xml
 # Local folders with generated data (optional)
 # data/processed/
 
-mdb_credenciales.env
+mdb_credenciales.txt

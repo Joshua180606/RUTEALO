@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <!-- Panel Izquierdo: Subida -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                📥 Subir Material
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Sube tus PDFs, PPTX o DOCX. El sistema los procesará y clasificará con IA automáticamente.</p>
+                <form action="/upload" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <input type="file" name="file" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        🚀 Subir y Procesar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Derecho: Archivos y Estado -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                📂 Mis Materiales
+            </div>
+            <div class="card-body">
+                {% if archivos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for archivo in archivos %}
+                            <tr>
+                                <td>{{ archivo.nombre_archivo }}</td>
+                                <td>{{ archivo.fecha_ingesta.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if archivo.estado_procesamiento == 'BLOOM_COMPLETADO' %}
+                                        <span class="badge bg-success">✅ Analizado</span>
+                                    {% elif archivo.estado_procesamiento == 'PENDIENTE' %}
+                                        <span class="badge bg-warning text-dark">⏳ En cola</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ archivo.estado_procesamiento }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info">Ver</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <h3>📭</h3>
+                    <p>No has subido ningún material aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
