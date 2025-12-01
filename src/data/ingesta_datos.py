@@ -2,6 +2,8 @@ import os
 import datetime
 import io
 import zipfile
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 import gridfs
@@ -15,39 +17,65 @@ MONGO_URI = "mongodb+srv://RUTEALO:aLTEC358036@cluster0.u4eugtp.mongodb.net/?app
 DB_NAME = "RUTEALO_DB"
 COLLECTION_RAW = "materiales_crudos"
 
+def pedir_usuario_gui():
+    """Abre un input dialog para pedir el nombre del usuario."""
+    try:
+        root = tk.Tk()
+        root.withdraw() # Ocultar ventana principal
+        root.attributes('-topmost', True) # Poner al frente
+        
+        nombre = simpledialog.askstring("Identificación", "Por favor, ingresa tu nombre de usuario para asociar los archivos:")
+        
+        root.destroy()
+        return nombre
+    except Exception as e:
+        print(f"⚠️ Error al pedir usuario: {e}")
+        # Fallback por consola si falla la GUI
+        return input("Ingresa tu nombre de usuario: ")
+
+def seleccionar_archivos_gui(initial_dir=None):
+    """Abre una ventana del gestor de archivos para seleccionar archivos."""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+
+        filetypes = [("Documentos", ("*.pdf", "*.docx", "*.pptx")), ("Todos los archivos", "*.*")]
+        paths = filedialog.askopenfilenames(
+            title='Seleccionar archivo(s) a procesar', 
+            initialdir=initial_dir or '.', 
+            filetypes=filetypes
+        )
+        root.destroy()
+        return list(paths)
+    except Exception as e:
+        print(f"⚠️ Error en selector de archivos: {e}")
+        return []
+
 def conectar_bd():
     try:
         client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
         client.admin.command('ping')
         db = client[DB_NAME]
         fs = gridfs.GridFS(db)
-
-        # Después de conectarnos, abrir selector de archivos para elegir uno o más archivos a procesar
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        raw_dir = os.path.join(base_dir, "data", "raw")
-
-        try:
-            archivos = seleccionar_archivos_gui(initial_dir=raw_dir)
-        except Exception:
-            archivos = []
-
-        return db[COLLECTION_RAW], fs, archivos
+        return db[COLLECTION_RAW], fs
     except Exception as e:
         print(f"❌ Error conectando a Atlas: {e}")
-        return None, None, []
+        return None, None
 
-# --- 2. FUNCIONES AUXILIARES ---
+# --- 2. FUNCIONES AUXILIARES (GridFS) ---
 
-def guardar_imagen_gridfs(fs, img_bytes, nombre_archivo, pagina_idx, img_idx, ext):
-    """Guarda una imagen en GridFS y devuelve su ID y metadatos."""
+def guardar_imagen_gridfs(fs, img_bytes, nombre_archivo, pagina_idx, img_idx, ext, usuario):
+    """Guarda una imagen en GridFS incluyendo el usuario en los metadatos."""
     try:
-        filename = f"{nombre_archivo}_P{pagina_idx}_IMG{img_idx}{ext}"
+        filename = f"{usuario}_{nombre_archivo}_P{pagina_idx}_IMG{img_idx}{ext}"
         file_id = fs.put(
             img_bytes, 
             filename=filename,
             metadata={
                 "documento_padre": nombre_archivo,
-                "pagina_origen": pagina_idx
+                "pagina_origen": pagina_idx,
+                "usuario_propietario": usuario
             }
         )
         return {
@@ -61,8 +89,7 @@ def guardar_imagen_gridfs(fs, img_bytes, nombre_archivo, pagina_idx, img_idx, ex
 
 # --- 3. EXTRACTORES POR PÁGINA/DIAPOSITIVA ---
 
-def procesar_pdf(ruta_archivo, fs):
-    """Estructura: Lista de Páginas con su texto e imágenes."""
+def procesar_pdf(ruta_archivo, fs, usuario):
     nombre_doc = os.path.basename(ruta_archivo)
     paginas_estructuradas = []
     
@@ -72,21 +99,21 @@ def procesar_pdf(ruta_archivo, fs):
             idx_pag = i + 1
             texto_pag = page.extract_text() or ""
             
-            # Procesar imágenes de ESTA página
+            # Procesar imágenes
             imagenes_pag = []
             for j, img in enumerate(page.images):
                 ext = os.path.splitext(img.name)[1]
-                img_info = guardar_imagen_gridfs(fs, img.data, nombre_doc, idx_pag, j+1, ext)
+                # Pasamos 'usuario' para que las imágenes también tengan esa metadata
+                img_info = guardar_imagen_gridfs(fs, img.data, nombre_doc, idx_pag, j+1, ext, usuario)
                 if img_info:
                     imagenes_pag.append(img_info)
             
-            # Agregamos la unidad estructurada
             paginas_estructuradas.append({
                 "indice": idx_pag,
                 "tipo_unidad": "pagina",
                 "contenido_texto": texto_pag,
                 "imagenes": imagenes_pag,
-                "metadata_bloom": None # Placeholder para la Fase 2
+                "metadata_bloom": None
             })
                 
         return paginas_estructuradas
@@ -94,8 +121,7 @@ def procesar_pdf(ruta_archivo, fs):
         print(f"⚠️ Error PDF: {e}")
         return []
 
-def procesar_pptx(ruta_archivo, fs):
-    """Estructura: Lista de Diapositivas."""
+def procesar_pptx(ruta_archivo, fs, usuario):
     nombre_doc = os.path.basename(ruta_archivo)
     diapositivas_estructuradas = []
     
@@ -106,19 +132,16 @@ def procesar_pptx(ruta_archivo, fs):
             texto_slide = ""
             imagenes_slide = []
             
-            # Iterar formas en la diapositiva
             img_count = 0
             for shape in slide.shapes:
-                # A. Texto
                 if hasattr(shape, "text"):
                     texto_slide += shape.text + "\n"
                 
-                # B. Imágenes
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                     img_count += 1
                     image = shape.image
                     ext = f".{image.ext}"
-                    img_info = guardar_imagen_gridfs(fs, image.blob, nombre_doc, idx_slide, img_count, ext)
+                    img_info = guardar_imagen_gridfs(fs, image.blob, nombre_doc, idx_slide, img_count, ext, usuario)
                     if img_info:
                         imagenes_slide.append(img_info)
 
@@ -135,17 +158,11 @@ def procesar_pptx(ruta_archivo, fs):
         print(f"⚠️ Error PPTX: {e}")
         return []
 
-def procesar_docx(ruta_archivo, fs):
-    """
-    Nota: DOCX no tiene 'páginas' fijas. Se tratará como una secuencia de párrafos.
-    Para mantener consistencia, crearemos una única 'unidad' grande o segmentaremos por títulos si es necesario.
-    Aquí optamos por crear una única unidad para no fragmentar el contexto, salvo que detectemos saltos de página explícitos.
-    """
+def procesar_docx(ruta_archivo, fs, usuario):
     nombre_doc = os.path.basename(ruta_archivo)
-    
-    # En Word, las imágenes son difíciles de vincular a un párrafo exacto sin XML parsing complejo.
-    # Usaremos el método ZIP para extraer todas las imágenes y las asociaremos a la unidad principal.
     imagenes_globales = []
+    
+    # Extracción de imágenes via ZIP
     try:
         with zipfile.ZipFile(ruta_archivo) as z:
             img_count = 0
@@ -154,11 +171,11 @@ def procesar_docx(ruta_archivo, fs):
                     img_count += 1
                     img_data = z.read(file_info)
                     ext = os.path.splitext(file_info.filename)[1]
-                    img_info = guardar_imagen_gridfs(fs, img_data, nombre_doc, 1, img_count, ext)
+                    img_info = guardar_imagen_gridfs(fs, img_data, nombre_doc, 1, img_count, ext, usuario)
                     if img_info:
                         imagenes_globales.append(img_info)
     except:
-        pass # Si falla extracción de imágenes, seguimos con texto
+        pass
 
     try:
         doc = Document(ruta_archivo)
@@ -166,7 +183,7 @@ def procesar_docx(ruta_archivo, fs):
         
         return [{
             "indice": 1,
-            "tipo_unidad": "documento_completo", # Word es fluido
+            "tipo_unidad": "documento_completo",
             "contenido_texto": texto_completo,
             "imagenes": imagenes_globales,
             "metadata_bloom": None
@@ -175,24 +192,28 @@ def procesar_docx(ruta_archivo, fs):
         print(f"⚠️ Error DOCX: {e}")
         return []
 
-# --- 4. PROCESO PRINCIPAL ---
+# --- 4. PROCESO PRINCIPAL DE INGESTA ---
 
-def ingestar_archivo(ruta_archivo, collection, fs):
+def ingestar_archivo(ruta_archivo, collection, fs, usuario):
+    """
+    Procesa un archivo y lo guarda en MongoDB asociado al usuario.
+    """
     if not os.path.exists(ruta_archivo):
         return
 
     nombre = os.path.basename(ruta_archivo)
     ext = os.path.splitext(nombre)[1].lower()
-    print(f"🔄 Procesando estructuradamente: {nombre}...")
+    print(f"🔄 Procesando: {nombre} (Usuario: {usuario})...")
 
     unidades_contenido = []
 
+    # Pasamos 'usuario' a las funciones de procesamiento
     if ext == '.pdf':
-        unidades_contenido = procesar_pdf(ruta_archivo, fs)
+        unidades_contenido = procesar_pdf(ruta_archivo, fs, usuario)
     elif ext == '.pptx':
-        unidades_contenido = procesar_pptx(ruta_archivo, fs)
+        unidades_contenido = procesar_pptx(ruta_archivo, fs, usuario)
     elif ext == '.docx':
-        unidades_contenido = procesar_docx(ruta_archivo, fs)
+        unidades_contenido = procesar_docx(ruta_archivo, fs, usuario)
     else:
         print(f"⚠️ Formato no soportado: {ext}")
         return
@@ -201,13 +222,14 @@ def ingestar_archivo(ruta_archivo, collection, fs):
         print("⚠️ No se extrajo contenido.")
         return
 
-    # Crear Documento Maestro
+    # Crear Documento Maestro con el campo de usuario
     documento = {
+        "usuario_propietario": usuario,  # <--- LLAVE DE USUARIO
         "nombre_archivo": nombre,
         "tipo_archivo": ext.replace('.', ''),
         "fecha_ingesta": datetime.datetime.utcnow(),
         "total_unidades": len(unidades_contenido),
-        "unidades_contenido": unidades_contenido, # <-- AQUÍ ESTÁ LA MAGIA (Array de páginas)
+        "unidades_contenido": unidades_contenido,
         "estado_procesamiento": "PENDIENTE",
         "metadata": {
             "tamano_bytes": os.path.getsize(ruta_archivo),
@@ -216,54 +238,41 @@ def ingestar_archivo(ruta_archivo, collection, fs):
     }
 
     try:
-        res = collection.insert_one(documento)
-        print(f"✅ Ingesta exitosa. {len(unidades_contenido)} unidades (páginas/slides) guardadas.")
+        # Usamos update_one con upsert para evitar duplicados del mismo archivo por el mismo usuario
+        filtro = {"nombre_archivo": nombre, "usuario_propietario": usuario}
+        res = collection.replace_one(filtro, documento, upsert=True)
+        
+        accion = "Actualizado" if res.matched_count > 0 else "Creado"
+        print(f"✅ {accion} exitosamente en Atlas para {usuario}. ({len(unidades_contenido)} unidades).")
+        
     except Exception as e:
         print(f"❌ Error guardando en MongoDB: {e}")
 
-
-def seleccionar_archivos_gui(initial_dir=None):
-    """Abre una ventana del gestor de archivos para que el usuario seleccione uno o más archivos.
-    Devuelve una lista de rutas seleccionadas (puede estar vacía si se cancela).
-    """
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-    except Exception as e:
-        print(f"⚠️ No se puede abrir el selector de archivos (tkinter no disponible): {e}")
-        return []
-
-    root = tk.Tk()
-    # No mostrar la ventana principal
-    root.withdraw()
-    # Forzar que el diálogo esté al frente
-    try:
-        root.attributes('-topmost', True)
-    except Exception:
-        pass
-
-    filetypes = [("Documentos", ("*.pdf", "*.docx", "*.pptx")), ("Todos los archivos", "*.*")]
-    paths = filedialog.askopenfilenames(title='Seleccionar archivo(s) a procesar', initialdir=initial_dir or '.', filetypes=filetypes)
-    root.destroy()
-
-    # filedialog devuelve tupla; convertir a lista para consistencia
-    return list(paths)
-
 # --- 5. EJECUCIÓN ---
-if __name__ == "__main__":
-    col, fs, archivos_seleccionados = conectar_bd()
-    
-    if col is not None:
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        raw_dir = os.path.join(base_dir, "data", "raw")
 
-        if not archivos_seleccionados:
-            print("⚠️ No se seleccionaron archivos. Saliendo.")
-        else:
-            for ruta in archivos_seleccionados:
-                # Opcional: Verificar si ya existe para no duplicar
-                archivo = os.path.basename(ruta)
-                if col.find_one({"nombre_archivo": archivo}):
-                    print(f"⏩ {archivo} ya existe.")
-                else:
-                    ingestar_archivo(ruta, col, fs)
+if __name__ == "__main__":
+    # 1. Pedir Usuario PRIMERO
+    usuario_actual = pedir_usuario_gui()
+
+    if not usuario_actual or usuario_actual.strip() == "":
+        print("❌ El nombre de usuario es obligatorio. Saliendo.")
+    else:
+        print(f"👤 Bienvenido, {usuario_actual}.")
+        
+        # 2. Conectar BD
+        col, fs = conectar_bd()
+        
+        if col is not None:
+            # 3. Seleccionar Archivos
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            raw_dir = os.path.join(base_dir, "data", "raw")
+            
+            print("📂 Abriendo selector de archivos...")
+            archivos_seleccionados = seleccionar_archivos_gui(initial_dir=raw_dir)
+
+            if not archivos_seleccionados:
+                print("⚠️ No se seleccionaron archivos.")
+            else:
+                # 4. Procesar cada archivo con el usuario
+                for ruta in archivos_seleccionados:
+                    ingestar_archivo(ruta, col, fs, usuario_actual)
