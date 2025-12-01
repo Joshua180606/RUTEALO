@@ -51,6 +51,8 @@ env.bak/
 # Environment variables
 .env
 .env.*
+claves.env
+claves.*.env
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
@@ -69,3 +71,5 @@ coverage.xml
 
 # Local folders with generated data (optional)
 # data/processed/
+
+mdb_credenciales.env

@@ -4,6 +4,7 @@ import io
 import zipfile
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
+from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 import gridfs
@@ -12,9 +13,12 @@ from docx import Document
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
+# Cargar variables de entorno desde claves.env
+load_dotenv('claves.env')
+
 # --- 1. CONFIGURACIÓN (ATLAS) ---
-MONGO_URI = "mongodb+srv://RUTEALO:aLTEC358036@cluster0.u4eugtp.mongodb.net/?appName=Cluster0"
-DB_NAME = "RUTEALO_DB"
+MONGO_URI = os.getenv('MONGO_URI')
+DB_NAME = os.getenv('DB_NAME')
 COLLECTION_RAW = "materiales_crudos"
 
 def pedir_usuario_gui():

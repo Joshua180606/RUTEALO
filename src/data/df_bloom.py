@@ -1,7 +1,10 @@
 import pandas as pd
 import pypdf
 import re 
-import os 
+import os
+from dotenv import load_dotenv
+
+load_dotenv('claves.env') 
 
 # --- 1. CONFIG ---
 # Rutas

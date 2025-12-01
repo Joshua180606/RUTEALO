@@ -3,14 +3,18 @@ import json
 import datetime
 import tkinter as tk
 from tkinter import messagebox, ttk
+from dotenv import load_dotenv
 import google.generativeai as genai
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
+# Cargar variables de entorno desde claves.env
+load_dotenv('claves.env')
+
 # --- 1. CONFIGURACIÓN ---
-MONGO_URI = "mongodb+srv://RUTEALO:aLTEC358036@cluster0.u4eugtp.mongodb.net/?appName=Cluster0"
-DB_NAME = "RUTEALO_DB"
+MONGO_URI = os.getenv('MONGO_URI')
+DB_NAME = os.getenv('DB_NAME')
 
 # Colecciones MongoDB
 COL_RAW = "materiales_crudos"       # Entrada (docs procesados)
@@ -19,7 +23,7 @@ COL_EXAM_INI = "examen_inicial"     # Diagnóstico (ZDP)
 COL_RUTAS = "rutas_aprendizaje"     # Ruta (Flow + Bloom)
 
 # API Key Google Gemini
-GOOGLE_API_KEY = "AIzaSyByrWYIL_pPxywgJY-UY1RUiwAPdsRSNTI"
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Configuración del Modelo

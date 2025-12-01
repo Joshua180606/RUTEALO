@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+from dotenv import load_dotenv
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from pymongo import MongoClient
@@ -8,6 +9,8 @@ from pymongo.server_api import ServerApi
 import gridfs
 from PIL import Image
 import io
+
+load_dotenv('claves.env')
 import re
 import tkinter as tk
 from tkinter import simpledialog
