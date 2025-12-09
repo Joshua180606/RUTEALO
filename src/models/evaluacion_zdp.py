@@ -76,7 +76,7 @@ class EvaluadorZDP:
             "puntaje_total": 0,
             "nivel_actual": None,
             "zona_proxima": [],
-            "recomendaciones": []
+            "recomendaciones": [],
         }
 
         # 1. Procesar cada respuesta
@@ -110,15 +110,17 @@ class EvaluadorZDP:
                 aciertos_por_nivel[nivel_bloom] += 1
 
             # Guardar respuesta procesada
-            resultado["respuestas_procesadas"].append({
-                "pregunta_id": pregunta_id,
-                "pregunta": pregunta.get("pregunta"),
-                "nivel_bloom": nivel_bloom,
-                "respuesta_estudiante": respuesta_est_val,
-                "respuesta_correcta": respuesta_correcta,
-                "es_correcto": es_correcto,
-                "tiempo_segundos": tiempo_seg
-            })
+            resultado["respuestas_procesadas"].append(
+                {
+                    "pregunta_id": pregunta_id,
+                    "pregunta": pregunta.get("pregunta"),
+                    "nivel_bloom": nivel_bloom,
+                    "respuesta_estudiante": respuesta_est_val,
+                    "respuesta_correcta": respuesta_correcta,
+                    "es_correcto": es_correcto,
+                    "tiempo_segundos": tiempo_seg,
+                }
+            )
 
         # 2. Calcular porcentajes por nivel y puntaje total
         puntaje_total = 0
@@ -135,7 +137,7 @@ class EvaluadorZDP:
                     "aciertos": aciertos,
                     "total": total,
                     "porcentaje": round(porcentaje, 2),
-                    "competente": porcentaje >= UMBRAL_COMPETENCIA
+                    "competente": porcentaje >= UMBRAL_COMPETENCIA,
                 }
 
                 # Sumar puntaje total (ponderado por dificultad)
@@ -174,25 +176,31 @@ class EvaluadorZDP:
         recomendaciones = []
 
         if competentes:
-            recomendaciones.append({
-                "tipo": "fortalezas",
-                "mensaje": f"El estudiante domina los siguientes niveles: {', '.join(competentes)}",
-                "accion": "Omitir o acelerar estos temas en la ruta"
-            })
+            recomendaciones.append(
+                {
+                    "tipo": "fortalezas",
+                    "mensaje": f"El estudiante domina los siguientes niveles: {', '.join(competentes)}",
+                    "accion": "Omitir o acelerar estos temas en la ruta",
+                }
+            )
 
         if brechas:
-            recomendaciones.append({
-                "tipo": "brechas",
-                "mensaje": f"Necesita refuerzo en: {', '.join(brechas)}",
-                "accion": "Enfatizar estos niveles con ejercicios prácticos y tutorización"
-            })
+            recomendaciones.append(
+                {
+                    "tipo": "brechas",
+                    "mensaje": f"Necesita refuerzo en: {', '.join(brechas)}",
+                    "accion": "Enfatizar estos niveles con ejercicios prácticos y tutorización",
+                }
+            )
 
         if zona_proxima:
-            recomendaciones.append({
-                "tipo": "zona_proxima",
-                "mensaje": f"Próximos objetivos de aprendizaje (ZDP): {', '.join(zona_proxima)}",
-                "accion": "Trabajar estos niveles con apoyo estructurado"
-            })
+            recomendaciones.append(
+                {
+                    "tipo": "zona_proxima",
+                    "mensaje": f"Próximos objetivos de aprendizaje (ZDP): {', '.join(zona_proxima)}",
+                    "accion": "Trabajar estos niveles con apoyo estructurado",
+                }
+            )
 
         return recomendaciones
 
@@ -216,10 +224,10 @@ class EvaluadorZDP:
                         "zona_proxima": resultado["zona_proxima"],
                         "puntaje_ultimo_examen": resultado["puntaje_total"],
                         "competencias": resultado["resumen_por_nivel"],
-                        "ultima_evaluacion": resultado["fecha_evaluacion"]
+                        "ultima_evaluacion": resultado["fecha_evaluacion"],
                     }
                 },
-                upsert=True
+                upsert=True,
             )
             logger.info(f"✅ Evaluación guardada para {usuario}")
         except Exception as e:
@@ -232,10 +240,7 @@ class EvaluadorZDP:
 
         try:
             col_evaluaciones = self.db.get_collection("evaluaciones_estudiante")
-            resultado = col_evaluaciones.find_one(
-                {"usuario": usuario},
-                sort=[("fecha_evaluacion", -1)]
-            )
+            resultado = col_evaluaciones.find_one({"usuario": usuario}, sort=[("fecha_evaluacion", -1)])
             return resultado
         except Exception as e:
             logger.error(f"❌ Error obteniendo evaluación: {e}")
@@ -305,6 +310,7 @@ class EvaluadorZDP:
         try:
             respuesta = model.generate_content(prompt)
             import re
+
             texto_limpio = re.sub(r"```json|```", "", respuesta.text).strip()
             datos = json.loads(texto_limpio)
             return datos.get("ruta_personalizada", {})
@@ -314,6 +320,7 @@ class EvaluadorZDP:
 
 
 # --- FUNCIONES DE UTILIDAD ---
+
 
 def evaluar_examen_simple(usuario, respuestas, examen):
     """Función simplificada para evaluar un examen."""
@@ -332,6 +339,6 @@ def obtener_perfil_zdp(usuario):
             "zona_proxima": evaluacion.get("zona_proxima"),
             "puntaje": evaluacion.get("puntaje_total"),
             "competencias": evaluacion.get("resumen_por_nivel"),
-            "recomendaciones": evaluacion.get("recomendaciones")
+            "recomendaciones": evaluacion.get("recomendaciones"),
         }
     return None

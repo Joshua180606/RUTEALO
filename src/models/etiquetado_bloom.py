@@ -22,19 +22,21 @@ model = get_genai_model()
 
 # --- 2. INTERFAZ DE USUARIO Y CONEXIÓN ---
 
+
 def pedir_usuario_gui():
     """Abre un input dialog para pedir el nombre del usuario."""
     try:
         root = tk.Tk()
         root.withdraw()
-        root.attributes('-topmost', True)
-        
+        root.attributes("-topmost", True)
+
         nombre = simpledialog.askstring("Identificación", "Ingresa tu nombre de usuario para procesar tus archivos:")
-        
+
         root.destroy()
         return nombre
     except Exception:
         return input("Ingresa tu nombre de usuario: ")
+
 
 def conectar_bd():
     try:
@@ -45,11 +47,12 @@ def conectar_bd():
         logger.error(f"❌ Error BD: {e}")
         return None, None
 
+
 def cargar_instrucciones_bloom():
     """Carga el CSV de reglas pedagógicas."""
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     ruta_csv = os.path.join(base_dir, "data", "processed", "df_bloom.csv")
-    
+
     if not os.path.exists(ruta_csv):
         return ""
 
@@ -62,6 +65,7 @@ def cargar_instrucciones_bloom():
     except Exception:
         return ""
 
+
 def recuperar_imagen(fs, gridfs_id):
     try:
         archivo = fs.get(gridfs_id)
@@ -70,7 +74,9 @@ def recuperar_imagen(fs, gridfs_id):
     except Exception:
         return None
 
+
 # --- 3. LÓGICA DE CLASIFICACIÓN CON IA ---
+
 
 def clasificar_unidad(texto, imagenes_pil, contexto_bloom):
     """
@@ -95,26 +101,28 @@ def clasificar_unidad(texto, imagenes_pil, contexto_bloom):
         "Keywords": ["keyword1", "keyword2"]
     }}
     """
-    
+
     contenido_usuario = ["--- CONTENIDO ---", texto]
     if imagenes_pil:
         contenido_usuario.append("--- IMÁGENES ---")
         contenido_usuario.extend(imagenes_pil)
-        
+
     try:
         response = model.generate_content([prompt_sistema] + contenido_usuario)
-        
+
         texto_limpio = response.text.strip()
         # Eliminar posibles bloques de markdown si la IA desobedece
         texto_limpio = re.sub(r"```json|```", "", texto_limpio).strip()
-        
+
         return json.loads(texto_limpio)
 
     except Exception as e:
         # Fallback por error técnico
         return {"Categoria_Bloom": "Otro", "Justificacion": f"Error técnico o de parseo: {str(e)}", "Keywords": []}
 
+
 # --- 4. PROCESO PRINCIPAL ---
+
 
 def procesar_documentos():
     # 1. Identificar Usuario
@@ -127,18 +135,16 @@ def procesar_documentos():
 
     # 2. Conexión y Contexto
     col_raw, fs = conectar_bd()
-    if col_raw is None: return
+    if col_raw is None:
+        return
 
     contexto_bloom = cargar_instrucciones_bloom()
-    
+
     # 3. Query Filtrado por Usuario
-    query = {
-        "usuario_propietario": usuario,
-        "estado_procesamiento": {"$in": ["PENDIENTE", "INGESTADO"]}
-    }
-    
+    query = {"usuario_propietario": usuario, "estado_procesamiento": {"$in": ["PENDIENTE", "INGESTADO"]}}
+
     documentos = list(col_raw.find(query))
-    
+
     if not documentos:
         logger.info("ℹ️ No hay documentos pendientes para este usuario.")
         return
@@ -146,23 +152,24 @@ def procesar_documentos():
     # 4. Procesamiento
     for doc in documentos:
         logger.info(f"📘 {doc['nombre_archivo']}...")
-        
+
         unidades = doc.get("unidades_contenido", [])
         unidades_actualizadas = []
         modificado = False
-        
+
         for i, unidad in enumerate(unidades):
             logger.debug(f"Pág {unidad.get('indice', i+1)}/{len(unidades)}")
-            
+
             texto = unidad.get("contenido_texto", "").strip()
-            
+
             # Recuperar imágenes
             imagenes_pil = []
             for img_ref in unidad.get("imagenes", []):
-                if 'gridfs_id' in img_ref:
-                    img_obj = recuperar_imagen(fs, img_ref['gridfs_id'])
-                    if img_obj: imagenes_pil.append(img_obj)
-            
+                if "gridfs_id" in img_ref:
+                    img_obj = recuperar_imagen(fs, img_ref["gridfs_id"])
+                    if img_obj:
+                        imagenes_pil.append(img_obj)
+
             # Si no hay nada, es "Otro" automáticamente
             if not texto and not imagenes_pil:
                 unidad["Categoria_Bloom"] = "Otro"
@@ -173,21 +180,21 @@ def procesar_documentos():
 
             # Clasificación IA
             resultado = clasificar_unidad(texto, imagenes_pil, contexto_bloom)
-            
+
             # Validación final del resultado
             cat = resultado.get("Categoria_Bloom", "Otro")
             if cat not in contexto_bloom and cat != "Otro":
                 # Si la IA alucina una categoría que no está en el CSV, forzamos a Otro o mantenemos bajo riesgo
                 # Aquí asumimos que confiamos en la IA o forzamos 'Otro' si es muy estricto
-                pass 
+                pass
 
             unidad["Categoria_Bloom"] = cat
             unidad["Pedagogia_Detalle"] = {
                 "justificacion": resultado.get("Justificacion", ""),
-                "keywords": resultado.get("Keywords", [])
+                "keywords": resultado.get("Keywords", []),
             }
             modificado = True
-            
+
             unidades_actualizadas.append(unidad)
 
         logger.info("✅")
@@ -199,11 +206,12 @@ def procesar_documentos():
                     "$set": {
                         "unidades_contenido": unidades_actualizadas,
                         "estado_procesamiento": "BLOOM_COMPLETADO",
-                        "fecha_procesamiento_ia": pd.Timestamp.now().isoformat()
+                        "fecha_procesamiento_ia": pd.Timestamp.now().isoformat(),
                     }
-                }
+                },
             )
             logger.info("💾 Guardado.")
+
 
 if __name__ == "__main__":
     procesar_documentos()
