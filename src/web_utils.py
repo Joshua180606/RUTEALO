@@ -335,3 +335,78 @@ def generar_ruta_aprendizaje(usuario, db):
     db[COL_RUTAS].replace_one({"usuario": usuario}, doc_ruta, upsert=True)
     
     return f"Ruta regenerada con {len(ruta_completa)} niveles y Examen Diagnóstico actualizado."
+
+
+# --- INTEGRACIÓN CON SISTEMA ZDP (NUEVO) ---
+
+def procesar_respuesta_examen_web(usuario, respuestas_estudiante, examen_original):
+    """
+    Procesa las respuestas del examen del estudiante y actualiza su perfil ZDP.
+    
+    Args:
+        usuario (str): ID del estudiante
+        respuestas_estudiante (list): Lista de respuestas en formato:
+            [
+                {"pregunta_id": 1, "respuesta": "a", "tiempo_seg": 45},
+                {"pregunta_id": 2, "respuesta": "c", "tiempo_seg": 32},
+                ...
+            ]
+        examen_original (dict): El examen original con respuestas correctas
+    
+    Returns:
+        dict: Resultado de evaluación con puntajes y recomendaciones
+    """
+    from src.models.evaluacion_zdp import EvaluadorZDP
+    
+    try:
+        evaluador = EvaluadorZDP()
+        resultado = evaluador.evaluar_examen(usuario, respuestas_estudiante, examen_original)
+        return resultado
+    except Exception as e:
+        print(f"❌ Error procesando examen: {e}")
+        return {"error": str(e)}
+
+
+def obtener_ruta_personalizada_web(usuario, contenido_disponible):
+    """
+    Obtiene la ruta de aprendizaje personalizada para el estudiante.
+    Omite temas donde ya es competente según su evaluación ZDP.
+    
+    Args:
+        usuario (str): ID del estudiante
+        contenido_disponible (str): Contenido educativo disponible
+    
+    Returns:
+        dict: Ruta personalizada adaptada a su ZDP
+    """
+    from src.models.evaluacion_zdp import EvaluadorZDP
+    
+    try:
+        evaluador = EvaluadorZDP()
+        ruta = evaluador.generar_ruta_personalizada(usuario, contenido_disponible)
+        return ruta
+    except Exception as e:
+        print(f"❌ Error generando ruta personalizada: {e}")
+        return {"error": str(e)}
+
+
+def obtener_perfil_estudiante_zdp(usuario):
+    """
+    Obtiene el perfil ZDP actual del estudiante con sus competencias y recomendaciones.
+    
+    Args:
+        usuario (str): ID del estudiante
+    
+    Returns:
+        dict: Perfil ZDP completo
+    """
+    from src.models.evaluacion_zdp import obtener_perfil_zdp
+    
+    perfil = obtener_perfil_zdp(usuario)
+    if perfil:
+        return perfil
+    return {
+        "usuario": usuario,
+        "estado": "Sin evaluación realizada",
+        "mensaje": "El estudiante aún no ha completado un examen diagnóstico"
+    }
