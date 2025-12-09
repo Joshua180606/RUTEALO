@@ -9,7 +9,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from werkzeug.utils import secure_filename
 from src.config import DB_NAME, COLS, RAW_DIR, get_genai_model
 from src.database import get_database
-from src.utils import retry
+from src.utils import retry, validate_exam_responses, validate_exam_structure
 
 # Importaciones para IA y lógica de negocio
 import pandas as pd
@@ -357,17 +357,35 @@ def procesar_respuesta_examen_web(usuario, respuestas_estudiante, examen_origina
         examen_original (dict): El examen original con respuestas correctas
     
     Returns:
-        dict: Resultado de evaluación con puntajes y recomendaciones
+        dict: Resultado de evaluación con puntajes y recomendaciones, o dict con error
     """
     from src.models.evaluacion_zdp import EvaluadorZDP
+    
+    # Validar estructura de respuestas del estudiante
+    is_valid, error_msg = validate_exam_responses(respuestas_estudiante)
+    if not is_valid:
+        logger.warning(f"Invalid exam responses for {usuario}: {error_msg}")
+        return {"error": f"Respuestas inválidas: {error_msg}", "status": 400}
+    
+    # Validar estructura del examen original
+    is_valid, error_msg = validate_exam_structure(examen_original)
+    if not is_valid:
+        logger.error(f"Invalid exam structure for {usuario}: {error_msg}")
+        return {"error": f"Estructura de examen inválida: {error_msg}", "status": 400}
+    
+    # Validar que el usuario existe
+    if not usuario or not isinstance(usuario, str):
+        logger.warning(f"Invalid usuario parameter: {usuario}")
+        return {"error": "Usuario inválido", "status": 400}
     
     try:
         evaluador = EvaluadorZDP()
         resultado = evaluador.evaluar_examen(usuario, respuestas_estudiante, examen_original)
+        logger.info(f"Exam processed successfully for {usuario}")
         return resultado
     except Exception as e:
-        logger.error(f"❌ Error procesando examen: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error procesando examen para {usuario}: {str(e)}")
+        return {"error": f"Error procesando examen: {str(e)}", "status": 500}
 
 
 def obtener_ruta_personalizada_web(usuario, contenido_disponible):

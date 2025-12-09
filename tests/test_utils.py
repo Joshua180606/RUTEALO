@@ -9,6 +9,9 @@ from src.utils import (
     validate_email,
     validate_username,
     validate_password_strength,
+    validate_exam_response,
+    validate_exam_responses,
+    validate_exam_structure,
     safe_get_nested,
     log_execution_time
 )
@@ -152,3 +155,103 @@ class TestLogExecutionTime:
         
         with pytest.raises(ValueError, match="Test error"):
             failing_func()
+
+
+class TestExamValidators:
+    """Tests para validadores de respuestas de examen."""
+    
+    def test_validate_exam_response_valid(self):
+        """Validar respuesta de examen válida."""
+        respuesta = {"pregunta_id": 1, "respuesta": "a"}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is True
+        assert msg is None
+    
+    def test_validate_exam_response_with_tiempo(self):
+        """Validar respuesta con tiempo_seg."""
+        respuesta = {"pregunta_id": 1, "respuesta": "b", "tiempo_seg": 45}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is True
+        assert msg is None
+    
+    def test_validate_exam_response_missing_pregunta_id(self):
+        """Validar que rechaza si falta pregunta_id."""
+        respuesta = {"respuesta": "a"}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is False
+        assert "pregunta_id" in msg
+    
+    def test_validate_exam_response_missing_respuesta(self):
+        """Validar que rechaza si falta respuesta."""
+        respuesta = {"pregunta_id": 1}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is False
+        assert "respuesta" in msg
+    
+    def test_validate_exam_response_empty_respuesta(self):
+        """Validar que rechaza respuestas vacías."""
+        respuesta = {"pregunta_id": 1, "respuesta": "   "}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is False
+    
+    def test_validate_exam_response_invalid_tiempo(self):
+        """Validar que rechaza tiempo_seg negativo."""
+        respuesta = {"pregunta_id": 1, "respuesta": "a", "tiempo_seg": -5}
+        is_valid, msg = validate_exam_response(respuesta)
+        assert is_valid is False
+    
+    def test_validate_exam_responses_valid_list(self):
+        """Validar lista válida de respuestas."""
+        respuestas = [
+            {"pregunta_id": 1, "respuesta": "a"},
+            {"pregunta_id": 2, "respuesta": "b", "tiempo_seg": 30},
+            {"pregunta_id": 3, "respuesta": "c"}
+        ]
+        is_valid, msg = validate_exam_responses(respuestas)
+        assert is_valid is True
+        assert msg is None
+    
+    def test_validate_exam_responses_empty_list(self):
+        """Validar que rechaza lista vacía."""
+        is_valid, msg = validate_exam_responses([])
+        assert is_valid is False
+        assert "No hay respuestas" in msg
+    
+    def test_validate_exam_responses_duplicate_pregunta_id(self):
+        """Validar que rechaza pregunta_ids duplicados."""
+        respuestas = [
+            {"pregunta_id": 1, "respuesta": "a"},
+            {"pregunta_id": 1, "respuesta": "b"}
+        ]
+        is_valid, msg = validate_exam_responses(respuestas)
+        assert is_valid is False
+        assert "más de una vez" in msg
+    
+    def test_validate_exam_responses_too_many(self):
+        """Validar que rechaza más de 100 respuestas."""
+        respuestas = [{"pregunta_id": i, "respuesta": "a"} for i in range(101)]
+        is_valid, msg = validate_exam_responses(respuestas)
+        assert is_valid is False
+        assert "demasiadas" in msg.lower()
+    
+    def test_validate_exam_structure_valid(self):
+        """Validar estructura de examen válida."""
+        examen = {"EXAMENES": {"EXAMEN_INICIAL": [{"id": 1, "pregunta": "?"}]}}
+        is_valid, msg = validate_exam_structure(examen)
+        assert is_valid is True
+        assert msg is None
+    
+    def test_validate_exam_structure_missing_examenes(self):
+        """Validar que rechaza si falta EXAMENES."""
+        examen = {"preguntas": []}
+        is_valid, msg = validate_exam_structure(examen)
+        assert is_valid is False
+        assert "EXAMENES" in msg
+    
+    def test_validate_exam_structure_empty_examenes(self):
+        """Validar que rechaza EXAMENES vacío."""
+        examen = {"EXAMENES": {}}
+        is_valid, msg = validate_exam_structure(examen)
+        assert is_valid is False
+        assert "no contiene" in msg.lower()
+

@@ -214,3 +214,117 @@ def log_execution_time(func: Callable) -> Callable:
             logger.error(f"[PERF] {func.__name__} falló después de {duration:.4f}s: {str(e)}")
             raise
     return wrapper
+
+
+# ============================================================================
+# EXAM RESPONSE VALIDATORS
+# ============================================================================
+
+def validate_exam_response(respuesta: dict) -> Tuple[bool, Optional[str]]:
+    """
+    Valida una respuesta individual de examen.
+    
+    Args:
+        respuesta (dict): Diccionario con estructura:
+            {"pregunta_id": int, "respuesta": str, "tiempo_seg": int (opcional)}
+    
+    Returns:
+        Tupla (is_valid, mensaje_error_o_none)
+    """
+    if not isinstance(respuesta, dict):
+        return False, "Respuesta debe ser un diccionario"
+    
+    # Validar pregunta_id
+    if "pregunta_id" not in respuesta:
+        return False, "Falta 'pregunta_id' en la respuesta"
+    
+    if not isinstance(respuesta["pregunta_id"], (int, float)):
+        return False, "'pregunta_id' debe ser un número"
+    
+    if respuesta["pregunta_id"] < 1:
+        return False, "'pregunta_id' debe ser mayor que 0"
+    
+    # Validar respuesta
+    if "respuesta" not in respuesta:
+        return False, "Falta 'respuesta' en la pregunta"
+    
+    if not isinstance(respuesta["respuesta"], str):
+        return False, "'respuesta' debe ser una cadena de texto"
+    
+    if len(respuesta["respuesta"].strip()) == 0:
+        return False, "'respuesta' no puede estar vacía"
+    
+    # Validar tiempo_seg (opcional pero si existe debe ser número)
+    if "tiempo_seg" in respuesta:
+        if not isinstance(respuesta["tiempo_seg"], (int, float)):
+            return False, "'tiempo_seg' debe ser un número"
+        if respuesta["tiempo_seg"] < 0:
+            return False, "'tiempo_seg' no puede ser negativo"
+    
+    return True, None
+
+
+def validate_exam_responses(respuestas: list) -> Tuple[bool, Optional[str]]:
+    """
+    Valida una lista completa de respuestas de examen.
+    
+    Args:
+        respuestas (list): Lista de respuestas de examen
+    
+    Returns:
+        Tupla (is_valid, mensaje_error_o_none)
+    """
+    if not isinstance(respuestas, list):
+        return False, "Las respuestas deben ser una lista"
+    
+    if len(respuestas) == 0:
+        return False, "No hay respuestas para validar"
+    
+    # Validar que no haya más de 100 respuestas (límite razonable)
+    if len(respuestas) > 100:
+        return False, "Demasiadas respuestas (máx: 100)"
+    
+    pregunta_ids = set()
+    
+    for idx, respuesta in enumerate(respuestas):
+        is_valid, msg = validate_exam_response(respuesta)
+        if not is_valid:
+            return False, f"Respuesta {idx + 1}: {msg}"
+        
+        pregunta_id = respuesta["pregunta_id"]
+        
+        # Validar que no hay pregunta_ids duplicados
+        if pregunta_id in pregunta_ids:
+            return False, f"Pregunta {pregunta_id} aparece más de una vez"
+        
+        pregunta_ids.add(pregunta_id)
+    
+    return True, None
+
+
+def validate_exam_structure(examen: dict) -> Tuple[bool, Optional[str]]:
+    """
+    Valida la estructura básica de un examen.
+    
+    Args:
+        examen (dict): Diccionario del examen con EXAMENES
+    
+    Returns:
+        Tupla (is_valid, mensaje_error_o_none)
+    """
+    if not isinstance(examen, dict):
+        return False, "El examen debe ser un diccionario"
+    
+    if "EXAMENES" not in examen:
+        return False, "El examen debe contener clave 'EXAMENES'"
+    
+    examenes = examen["EXAMENES"]
+    
+    if not isinstance(examenes, dict):
+        return False, "'EXAMENES' debe ser un diccionario"
+    
+    if len(examenes) == 0:
+        return False, "El examen no contiene pruebas"
+    
+    return True, None
+
