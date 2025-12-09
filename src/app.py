@@ -1,12 +1,16 @@
 import os
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from src.config import MONGO_URI, DB_NAME, COLS, RAW_DIR
+from src.config import MONGO_URI, DB_NAME, COLS, RAW_DIR, SECRET_KEY
 from src.web_utils import get_db, procesar_archivo_web, auto_etiquetar_bloom
 
+# Cargar variables de entorno
+load_dotenv('claves.env')
+
 app = Flask(__name__)
-app.secret_key = 'RUTEALO_SECRET_KEY_SUPER_SECRETA' # Cambiar en producción
+app.secret_key = SECRET_KEY
 
 # Configurar carpeta de subidas temporal
 UPLOAD_FOLDER = RAW_DIR / "uploads"
@@ -15,13 +19,15 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db = get_db()
 
-# --- RUTAS DE AUTENTICACIÓN ---
+# --- RUTAS DE AUTENTICACIÓN Y PÁGINAS ---
 
 @app.route('/')
 def index():
+    # Si el usuario ya está logueado, va al dashboard
     if 'usuario' in session:
         return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    # Si no, mostramos la nueva Landing Page
+    return render_template('landing.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -69,7 +75,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))  # Redirige a la landing page al salir
 
 # --- RUTAS PRINCIPALES ---
 

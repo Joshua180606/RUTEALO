@@ -1,5 +1,6 @@
 import os
 import datetime
+from dotenv import load_dotenv
 import gridfs
 import pypdf
 from docx import Document
@@ -8,6 +9,9 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pymongo import MongoClient
 from werkzeug.utils import secure_filename
 from src.config import MONGO_URI, DB_NAME, COLS, RAW_DIR, GOOGLE_API_KEY
+
+# Cargar variables de entorno
+load_dotenv('claves.env')
 
 # Importar lógica de bloom existente o re-implementar la función de clasificación
 import google.generativeai as genai
