@@ -29,3 +29,50 @@ python src/data/ingesta_datos.py
 ```
 
 Al finalizar el proceso verás en consola el resultado de la ingesta y si un archivo ya existía en la colección de MongoDB.
+
+---
+
+## 📚 Documentación del Proyecto
+
+### Análisis y Optimizaciones
+- **[RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)** - Hallazgos principales, recomendaciones y estado actual
+- **[ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md](./ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md)** - Análisis técnico detallado de cada issue
+- **[PLAN_IMPLEMENTACION_OPTIMIZACIONES.md](./PLAN_IMPLEMENTACION_OPTIMIZACIONES.md)** - Plan paso a paso con código listo para implementar
+
+### Documentación del Sistema
+- **[SISTEMA_ZDP_DOCUMENTACION.md](./SISTEMA_ZDP_DOCUMENTACION.md)** - Documentación completa del sistema de evaluación ZDP
+- **[SISTEMA_ZDP_DOCUMENTACION.md](./SISTEMA_ZDP_DOCUMENTACION.md)** - Pedagogía, API, ejemplos de uso
+
+---
+
+## ⚠️ Notas Importantes
+
+### Security
+- ✅ Credenciales migradas a variables de entorno
+- ⚠️ **PENDIENTE:** Regenerar MongoDB + Google API keys (fueron expuestas previamente)
+- 📝 Ver `RESUMEN_EJECUTIVO.md` para detalles
+
+### Performance
+- 📌 Se recomienda implementar las optimizaciones en `PLAN_IMPLEMENTACION_OPTIMIZACIONES.md`
+- 🔧 Priority: Database connection pooling (FASE 2)
+
+---
+
+## 🚀 Roadmap
+
+- [x] Implementación básica de ZDP
+- [x] Integración con Gemini AI
+- [x] Sistema de evaluación y scoring
+- [ ] Logging estructurado (en progreso)
+- [ ] Error handling robusto (próximamente)
+- [ ] Tests automatizados (próximamente)
+- [ ] CI/CD integration (futuro)
+
+---
+
+## 📞 Soporte
+
+Para preguntas sobre:
+- **Arquitectura pedagógica:** Ver `SISTEMA_ZDP_DOCUMENTACION.md`
+- **Code quality:** Ver `ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md`
+- **Implementación:** Ver `PLAN_IMPLEMENTACION_OPTIMIZACIONES.md`

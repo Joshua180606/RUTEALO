@@ -3,23 +3,22 @@ import datetime
 import io
 import zipfile
 import tkinter as tk
+import logging
 from tkinter import filedialog, simpledialog, messagebox
-from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
 import gridfs
 import pypdf
 from docx import Document
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-# Cargar variables de entorno desde claves.env
-load_dotenv('claves.env')
+# Cargar variables de entorno (centralizado en src.config)
+from src.config import DB_NAME, COLS
+from src.database import get_database
+
+logger = logging.getLogger(__name__)
 
 # --- 1. CONFIGURACIÓN (ATLAS) ---
-MONGO_URI = os.getenv('MONGO_URI')
-DB_NAME = os.getenv('DB_NAME')
-COLLECTION_RAW = "materiales_crudos"
+COLLECTION_RAW = COLS["RAW"]
 
 def pedir_usuario_gui():
     """Abre un input dialog para pedir el nombre del usuario."""
@@ -33,7 +32,7 @@ def pedir_usuario_gui():
         root.destroy()
         return nombre
     except Exception as e:
-        print(f"⚠️ Error al pedir usuario: {e}")
+        logger.error(f"⚠️ Error al pedir usuario: {e}")
         # Fallback por consola si falla la GUI
         return input("Ingresa tu nombre de usuario: ")
 
@@ -53,18 +52,16 @@ def seleccionar_archivos_gui(initial_dir=None):
         root.destroy()
         return list(paths)
     except Exception as e:
-        print(f"⚠️ Error en selector de archivos: {e}")
+        logger.error(f"⚠️ Error en selector de archivos: {e}")
         return []
 
 def conectar_bd():
     try:
-        client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
-        client.admin.command('ping')
-        db = client[DB_NAME]
+        db = get_database(DB_NAME)
         fs = gridfs.GridFS(db)
         return db[COLLECTION_RAW], fs
     except Exception as e:
-        print(f"❌ Error conectando a Atlas: {e}")
+        logger.error(f"Error conectando a base de datos: {e}")
         return None, None
 
 # --- 2. FUNCIONES AUXILIARES (GridFS) ---
@@ -88,7 +85,7 @@ def guardar_imagen_gridfs(fs, img_bytes, nombre_archivo, pagina_idx, img_idx, ex
             "tipo_mime": f"image/{ext.replace('.', '')}"
         }
     except Exception as e:
-        print(f"⚠️ Error guardando imagen {filename}: {e}")
+        logger.error(f"⚠️ Error guardando imagen {filename}: {e}")
         return None
 
 # --- 3. EXTRACTORES POR PÁGINA/DIAPOSITIVA ---
@@ -122,7 +119,7 @@ def procesar_pdf(ruta_archivo, fs, usuario):
                 
         return paginas_estructuradas
     except Exception as e:
-        print(f"⚠️ Error PDF: {e}")
+        logger.error(f"⚠️ Error PDF: {e}")
         return []
 
 def procesar_pptx(ruta_archivo, fs, usuario):
@@ -159,7 +156,7 @@ def procesar_pptx(ruta_archivo, fs, usuario):
             
         return diapositivas_estructuradas
     except Exception as e:
-        print(f"⚠️ Error PPTX: {e}")
+        logger.error(f"⚠️ Error PPTX: {e}")
         return []
 
 def procesar_docx(ruta_archivo, fs, usuario):
@@ -193,7 +190,7 @@ def procesar_docx(ruta_archivo, fs, usuario):
             "metadata_bloom": None
         }]
     except Exception as e:
-        print(f"⚠️ Error DOCX: {e}")
+        logger.error(f"⚠️ Error DOCX: {e}")
         return []
 
 # --- 4. PROCESO PRINCIPAL DE INGESTA ---
@@ -207,7 +204,7 @@ def ingestar_archivo(ruta_archivo, collection, fs, usuario):
 
     nombre = os.path.basename(ruta_archivo)
     ext = os.path.splitext(nombre)[1].lower()
-    print(f"🔄 Procesando: {nombre} (Usuario: {usuario})...")
+    logger.info(f"🔄 Procesando: {nombre} (Usuario: {usuario})...")
 
     unidades_contenido = []
 
@@ -219,11 +216,11 @@ def ingestar_archivo(ruta_archivo, collection, fs, usuario):
     elif ext == '.docx':
         unidades_contenido = procesar_docx(ruta_archivo, fs, usuario)
     else:
-        print(f"⚠️ Formato no soportado: {ext}")
+        logger.warning(f"⚠️ Formato no soportado: {ext}")
         return
 
     if not unidades_contenido:
-        print("⚠️ No se extrajo contenido.")
+        logger.warning("⚠️ No se extrajo contenido.")
         return
 
     # Crear Documento Maestro con el campo de usuario
@@ -247,10 +244,10 @@ def ingestar_archivo(ruta_archivo, collection, fs, usuario):
         res = collection.replace_one(filtro, documento, upsert=True)
         
         accion = "Actualizado" if res.matched_count > 0 else "Creado"
-        print(f"✅ {accion} exitosamente en Atlas para {usuario}. ({len(unidades_contenido)} unidades).")
+        logger.info(f"✅ {accion} exitosamente en Atlas para {usuario}. ({len(unidades_contenido)} unidades).")
         
     except Exception as e:
-        print(f"❌ Error guardando en MongoDB: {e}")
+        logger.error(f"❌ Error guardando en MongoDB: {e}")
 
 # --- 5. EJECUCIÓN ---
 
@@ -259,9 +256,9 @@ if __name__ == "__main__":
     usuario_actual = pedir_usuario_gui()
 
     if not usuario_actual or usuario_actual.strip() == "":
-        print("❌ El nombre de usuario es obligatorio. Saliendo.")
+        logger.error("❌ El nombre de usuario es obligatorio. Saliendo.")
     else:
-        print(f"👤 Bienvenido, {usuario_actual}.")
+        logger.info(f"👤 Bienvenido, {usuario_actual}.")
         
         # 2. Conectar BD
         col, fs = conectar_bd()
@@ -271,11 +268,11 @@ if __name__ == "__main__":
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             raw_dir = os.path.join(base_dir, "data", "raw")
             
-            print("📂 Abriendo selector de archivos...")
+            logger.info("📂 Abriendo selector de archivos...")
             archivos_seleccionados = seleccionar_archivos_gui(initial_dir=raw_dir)
 
             if not archivos_seleccionados:
-                print("⚠️ No se seleccionaron archivos.")
+                logger.warning("⚠️ No se seleccionaron archivos.")
             else:
                 # 4. Procesar cada archivo con el usuario
                 for ruta in archivos_seleccionados:

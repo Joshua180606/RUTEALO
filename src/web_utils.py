@@ -2,25 +2,24 @@ import os
 import datetime
 import gridfs
 import pypdf
+import logging
 from docx import Document
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
-from pymongo import MongoClient
 from werkzeug.utils import secure_filename
-from src.config import MONGO_URI, DB_NAME, COLS, RAW_DIR, GOOGLE_API_KEY
+from src.config import DB_NAME, COLS, RAW_DIR, get_genai_model
+from src.database import get_database
+from src.utils import retry
 
 # Importaciones para IA y lógica de negocio
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pandas as pd
 import json
 import re
 
-# --- CONFIGURACIÓN GENERATIVA ---
-genai.configure(api_key=GOOGLE_API_KEY)
-# Configuración relajada para asegurar respuestas
-safety_settings = {HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE}
-model = genai.GenerativeModel("gemini-2.5-flash", safety_settings=safety_settings)
+logger = logging.getLogger(__name__)
+
+# --- CONFIGURACIÓN GENERATIVA (Centralizada) ---
+model = get_genai_model()
 
 # Constantes de Lógica Educativa
 JERARQUIA_BLOOM = ["Recordar", "Comprender", "Aplicar", "Analizar", "Evaluar", "Crear"]
@@ -29,10 +28,10 @@ COL_RUTAS = "rutas_aprendizaje"
 COL_RAW = "materiales_crudos"
 
 # --- CONEXIÓN BD ---
-def get_db():
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
-    return db
+def get_db(db_name: str = DB_NAME):
+    """Get database using centralized connection."""
+    return get_database(db_name)
+    
 
 # --- LÓGICA DE INGESTA (Existente) ---
 def guardar_imagen_gridfs(fs, img_bytes, nombre_archivo, pagina_idx, img_idx, ext, usuario):
@@ -53,7 +52,7 @@ def procesar_archivo_web(ruta_archivo, usuario, db):
     ext = os.path.splitext(nombre)[1].lower()
     unidades_contenido = []
 
-    print(f"🌐 Procesando web: {nombre} para {usuario}")
+    logger.info(f"🌐 Procesando web: {nombre} para {usuario}")
 
     try:
         if ext == '.pdf':
@@ -110,7 +109,7 @@ def procesar_archivo_web(ruta_archivo, usuario, db):
             return True, len(unidades_contenido)
             
     except Exception as e:
-        print(f"Error procesando archivo: {e}")
+        logger.error(f"Error procesando archivo: {e}")
         return False, str(e)
     
     return False, "Formato no soportado o error desconocido"
@@ -188,8 +187,10 @@ def obtener_contexto_usuario(db, usuario):
     
     return contenido_por_nivel, contenido_total
 
+@retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
 def generar_examen_inicial(contenido_total):
-    """Genera un examen diagnóstico para determinar la Zona de Desarrollo Próximo (ZDP)."""
+    """Genera un examen diagnóstico para determinar la Zona de Desarrollo Próximo (ZDP).
+    Se reintenta automáticamente si falla."""
     if not contenido_total:
         return {}
 
@@ -222,11 +223,13 @@ def generar_examen_inicial(contenido_total):
         text_clean = re.sub(r"```json|```", "", res.text).strip()
         return json.loads(text_clean)
     except Exception as e:
-        print(f"⚠️ Error generando examen inicial: {e}")
+        logger.error(f"⚠️ Error generando examen inicial: {e}")
         return {}
 
+@retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
 def generar_bloque_ruta(nivel_bloom, textos_nivel):
-    """Genera Flashcards y Exámenes para un nivel específico de Bloom."""
+    """Genera Flashcards y Exámenes para un nivel específico de Bloom.
+    Se reintenta automáticamente si falla."""
     if not textos_nivel:
         return None
 
@@ -267,7 +270,7 @@ def generar_bloque_ruta(nivel_bloom, textos_nivel):
         text_clean = re.sub(r"```json|```", "", res.text).strip()
         return json.loads(text_clean)
     except Exception as e:
-        print(f"⚠️ Error generando bloque {nivel_bloom}: {e}")
+        logger.error(f"⚠️ Error generando bloque {nivel_bloom}: {e}")
         return None
 
 def generar_ruta_aprendizaje(usuario, db):
@@ -275,7 +278,7 @@ def generar_ruta_aprendizaje(usuario, db):
     Orquestador principal: Lee todo el material del usuario y (re)genera la ruta completa.
     Retorna un mensaje de estado.
     """
-    print(f"🛤️ Iniciando generación de ruta para: {usuario}")
+    logger.info(f"🛤️ Iniciando generación de ruta para: {usuario}")
 
     # 1. Obtener Contexto Global
     contenido_bloom, contenido_total_raw = obtener_contexto_usuario(db, usuario)
@@ -363,7 +366,7 @@ def procesar_respuesta_examen_web(usuario, respuestas_estudiante, examen_origina
         resultado = evaluador.evaluar_examen(usuario, respuestas_estudiante, examen_original)
         return resultado
     except Exception as e:
-        print(f"❌ Error procesando examen: {e}")
+        logger.error(f"❌ Error procesando examen: {e}")
         return {"error": str(e)}
 
 
@@ -386,7 +389,7 @@ def obtener_ruta_personalizada_web(usuario, contenido_disponible):
         ruta = evaluador.generar_ruta_personalizada(usuario, contenido_disponible)
         return ruta
     except Exception as e:
-        print(f"❌ Error generando ruta personalizada: {e}")
+        logger.error(f"❌ Error generando ruta personalizada: {e}")
         return {"error": str(e)}
 
 

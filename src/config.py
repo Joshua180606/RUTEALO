@@ -24,6 +24,13 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://default:default@cluster0.mongodb.net/?appName=default')
 DB_NAME = os.getenv('DB_NAME', 'RUTEALO_DB')
 
+# MongoDB Connection Pool Settings
+MONGODB_MIN_POOL_SIZE = int(os.getenv('MONGODB_MIN_POOL_SIZE', '1'))
+MONGODB_MAX_POOL_SIZE = int(os.getenv('MONGODB_MAX_POOL_SIZE', '10'))
+MONGODB_POOL_SIZE = int(os.getenv('MONGODB_POOL_SIZE', '30000'))  # maxIdleTimeMS
+MONGODB_CONNECT_TIMEOUT = int(os.getenv('MONGODB_CONNECT_TIMEOUT', '10000'))  # 10 seconds
+MONGODB_SOCKET_TIMEOUT = int(os.getenv('MONGODB_SOCKET_TIMEOUT', '30000'))  # 30 seconds
+
 # Colecciones MongoDB
 COLS = {
     "RAW": "materiales_crudos",
@@ -42,3 +49,38 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 # --- UPLOAD CONFIG ---
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx'}
+
+# --- GOOGLE GENERATIVE AI CONFIGURATION (Centralizado) ---
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
+GENAI_MODEL_NAME = "gemini-2.5-flash"
+GENAI_TEMPERATURE = 0.2  # Balance: determinístico pero creativo
+GENAI_TOP_P = 0.95
+
+# Safety settings estandarizados
+GENAI_SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
+GENAI_GENERATION_CONFIG = {
+    "response_mime_type": "application/json",
+    "temperature": GENAI_TEMPERATURE,
+    "top_p": GENAI_TOP_P,
+}
+
+def get_genai_model():
+    """
+    Retorna la instancia del modelo Gemini configurada.
+    Se inicializa una sola vez con todas las configuraciones centralizadas.
+    """
+    import google.generativeai as genai
+    if GOOGLE_API_KEY:
+        genai.configure(api_key=GOOGLE_API_KEY)
+    return genai.GenerativeModel(
+        model_name=GENAI_MODEL_NAME,
+        generation_config=GENAI_GENERATION_CONFIG,
+        safety_settings=GENAI_SAFETY_SETTINGS
+    )

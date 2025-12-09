@@ -2,9 +2,12 @@ import pandas as pd
 import pypdf
 import re 
 import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv('claves.env') 
+logger = logging.getLogger(__name__)
+
+# Variables de entorno cargadas (centralizado en src.config)
+# Solo usamos rutas locales en este archivo 
 
 # --- 1. CONFIG ---
 # Rutas
@@ -94,18 +97,18 @@ def get_df(raw):
     return pd.DataFrame.from_dict(data, orient='index')
 
 # --- 4. MAIN ---
-print(f"1. Leyendo {ruta_in}...")
+logger.info(f"1. Leyendo {ruta_in}...")
 txt = get_txt(ruta_in)
 
 if txt and "Error" not in txt:
-    print("2. Procesando...")
+    logger.info("2. Procesando...")
     df = get_df(txt)
     
     df.index.name = "cat_bloom"
-    print("\n--- DF RESULTADO ---")
-    print(df)
+    logger.info("\n--- DF RESULTADO ---")
+    logger.info("%s", df)
     
-    print(f"\n3. Guardando en {dir_out}...")
+    logger.info(f"\n3. Guardando en {dir_out}...")
     try:
         # Crea carpeta si no existe
         if not os.path.exists(dir_out):
@@ -116,9 +119,9 @@ if txt and "Error" not in txt:
         
         # Guardar CSV (utf-8-sig para Excel)
         df.to_csv(full_path, encoding='utf-8-sig')
-        print(f"OK: {full_path}")
+        logger.info(f"OK: {full_path}")
         
     except Exception as e:
-        print(f"Error save: {e}")
+        logger.error(f"Error save: {e}")
 else:
-    print(txt)
+    logger.error(txt)

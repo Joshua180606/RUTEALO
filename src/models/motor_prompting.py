@@ -3,35 +3,27 @@ import json
 import datetime
 import tkinter as tk
 from tkinter import messagebox, ttk
-from dotenv import load_dotenv
 import google.generativeai as genai
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import logging
 
-# Cargar variables de entorno desde claves.env
-load_dotenv('claves.env')
+# Cargar variables de entorno desde src.config
+from src.config import (
+    DB_NAME, COLS, get_genai_model
+)
+from src.database import get_database
+from src.utils import retry
+
+logger = logging.getLogger(__name__)
 
 # --- 1. CONFIGURACIÓN ---
-MONGO_URI = os.getenv('MONGO_URI')
-DB_NAME = os.getenv('DB_NAME')
-
 # Colecciones MongoDB
 COL_RAW = "materiales_crudos"       # Entrada (docs procesados)
 COL_PERFIL = "usuario_perfil"       # Perfil del estudiante
 COL_EXAM_INI = "examen_inicial"     # Diagnóstico (ZDP)
 COL_RUTAS = "rutas_aprendizaje"     # Ruta (Flow + Bloom)
 
-# API Key Google Gemini
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# Configuración del Modelo
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",
-    generation_config={"response_mime_type": "application/json", "temperature": 0.2},
-    safety_settings={HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE}
-)
+# Modelo Gemini (configuración centralizada)
+model = get_genai_model()
 
 # Jerarquía estricta de Bloom para la ruta
 JERARQUIA_BLOOM = ["Recordar", "Comprender", "Aplicar", "Analizar", "Evaluar", "Crear"]
@@ -40,11 +32,10 @@ JERARQUIA_BLOOM = ["Recordar", "Comprender", "Aplicar", "Analizar", "Evaluar", "
 
 def conectar_bd():
     try:
-        client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
-        db = client[DB_NAME]
+        db = get_database(DB_NAME)
         return db
     except Exception as e:
-        print(f"❌ Error conectando a BD: {e}")
+        logger.error(f"❌ Error conectando a BD: {e}")
         return None
 
 # --- 3. INTERFAZ DE USUARIO (PERFILADO) ---
@@ -121,9 +112,11 @@ def obtener_contexto_usuario(db, usuario):
     
     return contenido_por_nivel, contenido_total
 
+@retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
 def generar_examen_inicial(contenido_total):
     """
     Genera un examen diagnóstico para determinar la Zona de Desarrollo Próximo (ZDP).
+    Se reintenta automáticamente si falla.
     """
     if not contenido_total:
         return {}
@@ -157,12 +150,14 @@ def generar_examen_inicial(contenido_total):
         res = model.generate_content(prompt)
         return json.loads(res.text)
     except Exception as e:
-        print(f"⚠️ Error generando examen inicial: {e}")
+        logger.error(f"⚠️ Error generando examen inicial: {e}")
         return {}
 
+@retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
 def generar_bloque_ruta(nivel_bloom, textos_nivel):
     """
     Genera Flashcards y Exámenes para un nivel específico de Bloom (Teoría del Flow).
+    Se reintenta automáticamente si falla.
     """
     if not textos_nivel:
         return None
@@ -203,7 +198,7 @@ def generar_bloque_ruta(nivel_bloom, textos_nivel):
         res = model.generate_content(prompt)
         return json.loads(res.text)
     except Exception as e:
-        print(f"⚠️ Error generando bloque {nivel_bloom}: {e}")
+        logger.error(f"⚠️ Error generando bloque {nivel_bloom}: {e}")
         return None
 
 # --- 5. ORQUESTADOR PRINCIPAL ---
@@ -217,7 +212,7 @@ def procesar_motor():
     db = conectar_bd()
     if db is None: return
 
-    print(f"🚀 Iniciando Motor de Prompting para: {usuario_id}")
+    logger.info(f"🚀 Iniciando Motor de Prompting para: {usuario_id}")
 
     # 2. Guardar/Actualizar Perfil (USUARIO_PERFIL)
     perfil_doc = {
@@ -236,7 +231,7 @@ def procesar_motor():
         "ultima_actualizacion": datetime.datetime.utcnow()
     }
     db[COL_PERFIL].replace_one({"usuario": usuario_id}, perfil_doc, upsert=True)
-    print("✅ Perfil guardado.")
+    logger.info("✅ Perfil guardado.")
 
     # 3. Obtener Contexto de Documentos Ingestados
     contenido_bloom, contenido_total_raw = obtener_contexto_usuario(db, usuario_id)
@@ -246,7 +241,7 @@ def procesar_motor():
         return
 
     # 4. Generar Examen Inicial (EXAMEN_INICIAL)
-    print("🧠 Generando Examen Diagnóstico (ZDP)...")
+    logger.info("🧠 Generando Examen Diagnóstico (ZDP)...")
     examen_ini_data = generar_examen_inicial(contenido_total_raw)
     
     if examen_ini_data:
@@ -257,10 +252,10 @@ def procesar_motor():
             "fecha_generacion": datetime.datetime.utcnow()
         }
         db[COL_EXAM_INI].replace_one({"usuario": usuario_id}, doc_examen_ini, upsert=True)
-        print("✅ Examen Inicial generado y guardado.")
+        logger.info("✅ Examen Inicial generado y guardado.")
 
     # 5. Generar Ruta de Aprendizaje (RUTAS_APRENDIZAJE)
-    print("🛤️ Diseñando Ruta de Aprendizaje (Flow Theory)...")
+    logger.info("🛤️ Diseñando Ruta de Aprendizaje (Flow Theory)...")
     
     ruta_completa = {}
     secuencia_id = 1
@@ -269,10 +264,10 @@ def procesar_motor():
     for nivel in JERARQUIA_BLOOM:
         textos = contenido_bloom.get(nivel, [])
         if not textos:
-            print(f"   ℹ️ Saltando nivel {nivel} (sin contenido origen).")
+            logger.debug(f"   ℹ️ Saltando nivel {nivel} (sin contenido origen).")
             continue
             
-        print(f"   ⚡ Procesando Nivel: {nivel}...")
+        logger.debug(f"   ⚡ Procesando Nivel: {nivel}...")
         bloque_generado = generar_bloque_ruta(nivel, textos)
         
         if bloque_generado:
@@ -302,10 +297,10 @@ def procesar_motor():
 
     db[COL_RUTAS].replace_one({"usuario": usuario_id}, doc_ruta, upsert=True)
     
-    print("\n✨ ¡PROCESO COMPLETADO!")
-    print(f"   - Perfil actualizado")
-    print(f"   - Examen Inicial creado ({len(examen_ini_data.get('EXAMENES', {}).get('EXAMEN_INICIAL', []))} preguntas)")
-    print(f"   - Ruta de aprendizaje generada con {len(ruta_completa)} niveles Bloom.")
+    logger.info("\n✨ ¡PROCESO COMPLETADO!")
+    logger.info(f"   - Perfil actualizado")
+    logger.info(f"   - Examen Inicial creado ({len(examen_ini_data.get('EXAMENES', {}).get('EXAMEN_INICIAL', []))} preguntas)")
+    logger.info(f"   - Ruta de aprendizaje generada con {len(ruta_completa)} niveles Bloom.")
     messagebox.showinfo("Éxito", "La Ruta de Aprendizaje ha sido generada correctamente en MongoDB.")
 
 if __name__ == "__main__":

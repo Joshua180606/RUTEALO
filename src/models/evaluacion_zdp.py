@@ -16,26 +16,21 @@ Este módulo:
 import os
 import json
 import datetime
-from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-load_dotenv('claves.env')
-
-# Configuración
-MONGO_URI = os.getenv('MONGO_URI')
-DB_NAME = os.getenv('DB_NAME')
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-
-genai.configure(api_key=GOOGLE_API_KEY)
-
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",
-    generation_config={"response_mime_type": "application/json", "temperature": 0.3},
-    safety_settings={HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE}
+# Configuración centralizada en src.config
+from src.config import (
+    DB_NAME,
+    get_genai_model,
 )
+from src.database import get_database
+from src.utils import retry
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Modelo Gemini (configuración centralizada)
+model = get_genai_model()
 
 # Jerarquía de Bloom (del más simple al más complejo)
 JERARQUIA_BLOOM = ["Recordar", "Comprender", "Aplicar", "Analizar", "Evaluar", "Crear"]
@@ -50,10 +45,9 @@ class EvaluadorZDP:
     def __init__(self):
         """Inicializa la conexión a la BD."""
         try:
-            client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
-            self.db = client[DB_NAME]
+            self.db = get_database(DB_NAME)
         except Exception as e:
-            print(f"❌ Error conectando a BD: {e}")
+            logger.error(f"❌ Error conectando a BD: {e}")
             self.db = None
 
     def evaluar_examen(self, usuario, respuestas_estudiante, examen_original):
@@ -227,9 +221,9 @@ class EvaluadorZDP:
                 },
                 upsert=True
             )
-            print(f"✅ Evaluación guardada para {usuario}")
+            logger.info(f"✅ Evaluación guardada para {usuario}")
         except Exception as e:
-            print(f"❌ Error guardando evaluación: {e}")
+            logger.error(f"❌ Error guardando evaluación: {e}")
 
     def obtener_evaluacion_estudiante(self, usuario):
         """Obtiene la evaluación más reciente de un estudiante."""
@@ -244,12 +238,14 @@ class EvaluadorZDP:
             )
             return resultado
         except Exception as e:
-            print(f"❌ Error obteniendo evaluación: {e}")
+            logger.error(f"❌ Error obteniendo evaluación: {e}")
             return None
 
+    @retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
     def generar_ruta_personalizada(self, usuario, material_disponible):
         """
         Genera una ruta de aprendizaje personalizada según la evaluación ZDP.
+        Se reintenta automáticamente si falla.
 
         Args:
             usuario (str): ID del estudiante
@@ -313,7 +309,7 @@ class EvaluadorZDP:
             datos = json.loads(texto_limpio)
             return datos.get("ruta_personalizada", {})
         except Exception as e:
-            print(f"❌ Error generando ruta personalizada: {e}")
+            logger.error(f"❌ Error generando ruta personalizada: {e}")
             return {"error": str(e)}
 
 

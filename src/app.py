@@ -1,13 +1,17 @@
 import os
-from dotenv import load_dotenv
+import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from src.config import MONGO_URI, DB_NAME, COLS, RAW_DIR, SECRET_KEY
+from src.config import COLS, RAW_DIR, SECRET_KEY, DEBUG
+from src.logging_config import setup_logging, get_logger
+from src.database import get_database_connection
 from src.web_utils import get_db, procesar_archivo_web, auto_etiquetar_bloom
 
-# Cargar variables de entorno
-load_dotenv('claves.env')
+# Configurar logging
+is_production = not DEBUG
+setup_logging(log_level="DEBUG" if DEBUG else "INFO", is_production=is_production)
+logger = get_logger(__name__)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -16,6 +20,14 @@ app.secret_key = SECRET_KEY
 UPLOAD_FOLDER = RAW_DIR / "uploads"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Inicializar conexión a base de datos
+try:
+    db_connection = get_database_connection()
+    logger.info("Database connection initialized")
+except Exception as e:
+    logger.error(f"Failed to initialize database: {str(e)}")
+    raise
 
 db = get_db()
 
@@ -133,5 +145,22 @@ def upload_file():
 
     return redirect(url_for('dashboard'))
 
+
+@app.teardown_appcontext
+def shutdown_database(exception=None):
+    """Close database connection on app shutdown."""
+    try:
+        db_connection.close()
+        logger.info("Database connection closed")
+    except Exception as e:
+        logger.error(f"Error closing database: {str(e)}")
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    try:
+        app.run(debug=DEBUG, port=5000)
+    except KeyboardInterrupt:
+        logger.info("App interrupted by user")
+    except Exception as e:
+        logger.error(f"App error: {str(e)}")
+        raise

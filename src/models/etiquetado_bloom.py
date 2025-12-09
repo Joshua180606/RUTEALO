@@ -1,48 +1,24 @@
 import os
 import json
 import pandas as pd
-from dotenv import load_dotenv
+import logging
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
+import re
+import tkinter as tk
+from tkinter import simpledialog
+from src.config import DB_NAME, COLS, get_genai_model
+from src.database import get_database
 import gridfs
 from PIL import Image
 import io
 
-load_dotenv('claves.env')
-import re
-import tkinter as tk
-from tkinter import simpledialog
+logger = logging.getLogger(__name__)
 
-# --- 1. CONFIGURACIÓN ---
-MONGO_URI = "mongodb+srv://RUTEALO:aLTEC358036@cluster0.u4eugtp.mongodb.net/?appName=Cluster0"
-DB_NAME = "RUTEALO_DB"
-COLLECTION_RAW = "materiales_crudos"
+# --- 1. CONFIGURACIÓN (Centralizada en src.config) ---
+COLLECTION_RAW = COLS["RAW"]
 
-# API Key de Google Gemini
-GOOGLE_API_KEY = "AIzaSyByrWYIL_pPxywgJY-UY1RUiwAPdsRSNTI"
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# Configuración del Modelo
-generation_config = {
-    "temperature": 0.0,  # Temperatura a 0 para máxima determinación
-    "top_p": 0.95,
-    "response_mime_type": "application/json",
-}
-
-safety_settings = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",
-    generation_config=generation_config,
-    safety_settings=safety_settings
-)
+# Modelo Gemini (configuración centralizada)
+model = get_genai_model()
 
 # --- 2. INTERFAZ DE USUARIO Y CONEXIÓN ---
 
@@ -50,7 +26,7 @@ def pedir_usuario_gui():
     """Abre un input dialog para pedir el nombre del usuario."""
     try:
         root = tk.Tk()
-        root.withdraw() 
+        root.withdraw()
         root.attributes('-topmost', True)
         
         nombre = simpledialog.askstring("Identificación", "Ingresa tu nombre de usuario para procesar tus archivos:")
@@ -62,12 +38,11 @@ def pedir_usuario_gui():
 
 def conectar_bd():
     try:
-        client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
-        db = client[DB_NAME]
+        db = get_database(DB_NAME)
         fs = gridfs.GridFS(db)
         return db[COLLECTION_RAW], fs
     except Exception as e:
-        print(f"❌ Error BD: {e}")
+        logger.error(f"❌ Error BD: {e}")
         return None, None
 
 def cargar_instrucciones_bloom():
@@ -145,10 +120,10 @@ def procesar_documentos():
     # 1. Identificar Usuario
     usuario = pedir_usuario_gui()
     if not usuario:
-        print("❌ Usuario requerido.")
+        logger.error("❌ Usuario requerido.")
         return
 
-    print(f"👤 Buscando archivos para: {usuario}")
+    logger.info(f"👤 Buscando archivos para: {usuario}")
 
     # 2. Conexión y Contexto
     col_raw, fs = conectar_bd()
@@ -165,19 +140,19 @@ def procesar_documentos():
     documentos = list(col_raw.find(query))
     
     if not documentos:
-        print("ℹ️ No hay documentos pendientes para este usuario.")
+        logger.info("ℹ️ No hay documentos pendientes para este usuario.")
         return
 
     # 4. Procesamiento
     for doc in documentos:
-        print(f"\n📘 {doc['nombre_archivo']}...")
+        logger.info(f"📘 {doc['nombre_archivo']}...")
         
         unidades = doc.get("unidades_contenido", [])
         unidades_actualizadas = []
         modificado = False
         
         for i, unidad in enumerate(unidades):
-            print(f"\r   Pág {unidad.get('indice', i+1)}/{len(unidades)}...", end="", flush=True)
+            logger.debug(f"Pág {unidad.get('indice', i+1)}/{len(unidades)}")
             
             texto = unidad.get("contenido_texto", "").strip()
             
@@ -215,7 +190,7 @@ def procesar_documentos():
             
             unidades_actualizadas.append(unidad)
 
-        print(" ✅")
+        logger.info("✅")
 
         if modificado:
             col_raw.update_one(
@@ -228,7 +203,7 @@ def procesar_documentos():
                     }
                 }
             )
-            print("   💾 Guardado.")
+            logger.info("💾 Guardado.")
 
 if __name__ == "__main__":
     procesar_documentos()

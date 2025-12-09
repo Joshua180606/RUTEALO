@@ -2,9 +2,12 @@ import pandas as pd
 import pypdf
 import re
 import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv('claves.env')
+logger = logging.getLogger(__name__)
+
+# Variables de entorno cargadas (centralizado en src.config)
+# Solo usamos rutas locales en este archivo
 
 # --- 1. CONFIG ---
 # Rutas entorno prueba
@@ -91,27 +94,27 @@ def get_df_flow_detallado(raw):
     return pd.DataFrame(data)
 
 # --- 4. MAIN ---
-print(f"1. Leyendo {ruta_in}...")
+logger.info(f"1. Leyendo {ruta_in}...")
 txt = get_txt(ruta_in)
 
 if txt and "Err" not in txt:
-    print("2. Procesando y categorizando contenido...")
+    logger.info("2. Procesando y categorizando contenido...")
     df = get_df_flow_detallado(txt)
     
-    print("\n--- DF DETALLADO (Vista Previa) ---")
+    logger.info("\n--- DF DETALLADO (Vista Previa) ---")
     # Mostramos columnas clave para verificar la división
-    print(df[['dimension', 'txt_definicion', 'txt_evidencia']].head())
+    logger.info("%s", df[['dimension', 'txt_definicion', 'txt_evidencia']].head())
     
-    print(f"\n3. Guardando en {dir_out}...")
+    logger.info(f"\n3. Guardando en {dir_out}...")
     try:
         if not os.path.exists(dir_out):
             os.makedirs(dir_out)
         
         full = os.path.join(dir_out, file_out)
         df.to_csv(full, encoding='utf-8-sig', index=False)
-        print(f"OK: {full}")
+        logger.info(f"OK: {full}")
         
     except Exception as e:
-        print(f"Err save: {e}")
+        logger.error(f"Err save: {e}")
 else:
-    print(txt)
+    logger.error(txt)
