@@ -197,26 +197,138 @@ def obtener_contexto_usuario(db, usuario):
     return contenido_por_nivel, contenido_total
 
 
+def cargar_marcos_pedagogicos():
+    """Carga los CSV con teoría pedagógica (ZDP, Bloom, Flow) para guiar la generación del examen."""
+    import pandas as pd
+    import os
+    
+    base_path = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
+    
+    marcos = {
+        "bloom": None,
+        "zdp": None,
+        "flow": None
+    }
+    
+    try:
+        # Cargar df_bloom.csv
+        bloom_path = os.path.join(base_path, "df_bloom.csv")
+        if os.path.exists(bloom_path):
+            marcos["bloom"] = pd.read_csv(bloom_path)
+            logger.info(f"✅ Cargado df_bloom.csv: {len(marcos['bloom'])} filas")
+        
+        # Cargar df_zdp.csv
+        zdp_path = os.path.join(base_path, "df_zdp.csv")
+        if os.path.exists(zdp_path):
+            marcos["zdp"] = pd.read_csv(zdp_path)
+            logger.info(f"✅ Cargado df_zdp.csv: {len(marcos['zdp'])} filas")
+        
+        # Cargar df_flow.csv
+        flow_path = os.path.join(base_path, "df_flow.csv")
+        if os.path.exists(flow_path):
+            marcos["flow"] = pd.read_csv(flow_path)
+            logger.info(f"✅ Cargado df_flow.csv: {len(marcos['flow'])} filas")
+    
+    except Exception as e:
+        logger.warning(f"⚠️ Error cargando marcos pedagógicos: {e}")
+    
+    return marcos
+
+
 @retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
 def generar_examen_inicial(contenido_total):
-    """Genera un examen diagnóstico para determinar la Zona de Desarrollo Próximo (ZDP).
-    Se reintenta automáticamente si falla."""
+    """Genera un examen diagnóstico CON PREGUNTAS REALES SOBRE EL MATERIAL del usuario.
+    
+    NUEVA ESTRATEGIA (Diciembre 2025):
+    - Usa marcos pedagógicos de minería de datos (CSV: df_zdp, df_bloom, df_flow)
+    - Genera preguntas SOBRE CONCEPTOS DEL MATERIAL (no autoevaluación)
+    - Según las respuestas correctas/incorrectas, determina el nivel Bloom del estudiante
+    - Incluye opción "e) No lo sé / Omitir" obligatoria
+    
+    Se reintenta automáticamente si falla.
+    """
     if not contenido_total:
         return {}
 
+    # Cargar marcos pedagógicos desde CSV
+    marcos = cargar_marcos_pedagogicos()
+    
+    # Construir contexto pedagógico desde CSV para guiar la IA
+    contexto_pedagogico = "\n📚 MARCOS TEÓRICOS PARA EVALUACIÓN PEDAGÓGICA:\n"
+    
+    # Marco Bloom (procesos cognitivos y tipos de conocimiento)
+    if marcos["bloom"] is not None and len(marcos["bloom"]) > 0:
+        contexto_pedagogico += "\n🔷 TAXONOMÍA DE BLOOM (Procesos cognitivos):\n"
+        for _, row in marcos["bloom"].iterrows():
+            cat = row.get("cat_bloom", "N/A")
+            desc = str(row.get("proc_desc", ""))[:200]  # Primeros 200 chars
+            if desc and desc != "N/A" and desc != "nan":
+                contexto_pedagogico += f"  • {cat}: {desc}\n"
+    
+    # Marco ZDP (principios del aprendizaje desarrollador)
+    if marcos["zdp"] is not None and len(marcos["zdp"]) > 0:
+        contexto_pedagogico += "\n🎯 ZONA DE DESARROLLO PRÓXIMO (Principios):\n"
+        zdp_sample = marcos["zdp"].head(6)  # Primeros 6 principios
+        for _, row in zdp_sample.iterrows():
+            principio = row.get("principio_zdp", "N/A")
+            bloom_sug = row.get("cat_bloom_sugerida", "N/A")
+            if principio != "N/A":
+                contexto_pedagogico += f"  • {principio} → Evaluar con nivel: {bloom_sug}\n"
+    
+    # Marco Flow (dimensiones de experiencia óptima)
+    if marcos["flow"] is not None and len(marcos["flow"]) > 0:
+        contexto_pedagogico += "\n⚡ TEORÍA DEL FLOW (Dimensiones de motivación):\n"
+        flow_sample = marcos["flow"].head(4)
+        for _, row in flow_sample.iterrows():
+            dimension = row.get("dimension", "N/A")
+            bloom_sug = row.get("cat_bloom", "N/A")
+            if dimension != "N/A":
+                contexto_pedagogico += f"  • {dimension} → Nivel: {bloom_sug}\n"
+
     prompt = f"""
-    Actúa como un psicopedagogo experto. Basado en el siguiente contenido educativo, genera un EXAMEN DE DIAGNÓSTICO (Test de Conocimientos Previos).
+    Eres un profesor universitario experto en evaluación pedagógica con doctorado en Ciencias de la Educación.
     
-    OBJETIVO: Identificar la Zona de Desarrollo Próximo del estudiante evaluando sus conocimientos SOBRE EL CONTENIDO ESPECÍFICO del material.
+    TAREA: Genera un EXAMEN DIAGNÓSTICO para evaluar qué nivel de la Taxonomía de Bloom domina el estudiante sobre el material.
     
-    ESTRATEGIA:
-    - Genera 8-10 preguntas de dificultad incremental basadas EN CONCEPTOS, TÉRMINOS Y TEMAS que aparecen en el contenido.
-    - Niveles Bloom: Empieza en "Recordar" (definiciones, hechos), sube a "Comprender" (explicaciones), luego "Aplicar" (casos), hasta "Analizar" (relaciones).
-    - TODAS las preguntas deben tener 5 opciones: 4 respuestas (a, b, c, d) + 1 opción especial "e) No lo sé / Omitir"
-    - La respuesta correcta NUNCA debe ser la opción "e"
+    {contexto_pedagogico}
     
-    CONTENIDO BASE (Material del estudiante):
-    {contenido_total[:18000]}
+    📄 MATERIAL DEL ESTUDIANTE (contenido que subió):
+    {contenido_total[:15000]}
+    
+    ⚠️ IMPORTANTE: Debes hacer preguntas SOBRE EL CONTENIDO ESPECÍFICO del material, NO preguntas meta-cognitivas.
+    
+    ❌ MAL (preguntas genéricas que NO evalúan conocimiento real):
+       - "¿Cuál es el concepto central que identificas en el material?"
+       - "¿Qué objetivo principal se persigue en el material?"
+       - "¿Qué limitación identificas en tu comprensión actual?"
+    
+    ✅ BIEN (preguntas sobre conceptos, definiciones y temas del material):
+       - "¿Qué es una base de datos relacional según el texto?" (si el tema es BD)
+       - "¿Cuál es la diferencia entre normalización 2NF y 3NF mencionada?" (si el tema es BD)
+       - "Según el material, ¿qué ventaja tiene el índice B-tree sobre el hash?" (si el tema es BD)
+       - "¿Cómo implementarías una transacción ACID en PostgreSQL según lo explicado?" (si el tema es BD)
+    
+    REGLAS CRÍTICAS:
+    1. Lee TODO el material y extrae CONCEPTOS CLAVE, DEFINICIONES, PROCESOS Y TEORÍAS mencionados
+    
+    2. Genera 10-12 preguntas distribuidas así:
+       • 2-3 preguntas nivel RECORDAR: Definiciones, términos, hechos ("¿Qué es X?", "¿Cuál es la fórmula de Y?")
+       • 2-3 preguntas nivel COMPRENDER: Explicaciones, interpretaciones ("¿Por qué ocurre X?", "Explica el concepto Y")
+       • 2-3 preguntas nivel APLICAR: Casos prácticos ("¿Cómo usarías X para resolver Y?")
+       • 2 preguntas nivel ANALIZAR: Comparaciones, relaciones ("¿Qué diferencia hay entre X e Y?")
+       • 1-2 preguntas nivel EVALUAR: Juicios, críticas ("¿Cuál enfoque es mejor según...?")
+       • 0-1 pregunta nivel CREAR: Diseño, síntesis ("¿Cómo combinarías X e Y?")
+    
+    3. TODAS las preguntas deben tener EXACTAMENTE 5 opciones: a, b, c, d + "e) No lo sé / Omitir"
+    
+    4. Las opciones incorrectas (distractores) deben:
+       • Ser PLAUSIBLES (conceptos relacionados del mismo dominio)
+       • Basarse en ERRORES COMUNES o conceptos similares del material
+       • NO ser obviamente falsas
+    
+    5. La opción correcta debe estar TEXTUALMENTE o CONCEPTUALMENTE en el material (no inventar información)
+    
+    6. Si el material menciona ejemplos, úsalos en las preguntas de nivel Aplicar/Analizar
     
     FORMATO JSON OBLIGATORIO:
     {{
@@ -224,12 +336,12 @@ def generar_examen_inicial(contenido_total):
             "EXAMEN_INICIAL": [
                 {{
                     "id": 1,
-                    "pregunta": "¿Qué significa [TÉRMINO DEL CONTENIDO]?",
+                    "pregunta": "Según el material, ¿qué es [CONCEPTO CLAVE del texto]?",
                     "opciones": [
-                        "a) [Definición correcta del contenido]",
-                        "b) [Definición incorrecta plausible]",
-                        "c) [Otra definición incorrecta]",
-                        "d) [Distractor]",
+                        "a) [Definición correcta extraída del material]",
+                        "b) [Definición plausible pero incorrecta de un concepto relacionado]",
+                        "c) [Otra definición incorrecta común]",
+                        "d) [Distractor basado en error conceptual típico]",
                         "e) No lo sé / Omitir"
                     ],
                     "respuesta_correcta": "a",
@@ -237,26 +349,67 @@ def generar_examen_inicial(contenido_total):
                 }},
                 {{
                     "id": 2,
-                    "pregunta": "Según el material, ¿cuál es la relación entre [CONCEPTO A] y [CONCEPTO B]?",
+                    "pregunta": "¿Por qué [PROCESO O CONCEPTO mencionado] funciona de esa manera según el texto?",
                     "opciones": [
-                        "a) [Relación correcta]",
-                        "b) [Relación incorrecta]",
-                        "c) [Otra incorrecta]",
-                        "d) [Distractor]",
+                        "a) [Explicación plausible pero incorrecta]",
+                        "b) [Explicación correcta del material]",
+                        "c) [Otra explicación incorrecta]",
+                        "d) [Confusión común sobre el tema]",
+                        "e) No lo sé / Omitir"
+                    ],
+                    "respuesta_correcta": "b",
+                    "nivel_bloom_evaluado": "Comprender"
+                }},
+                {{
+                    "id": 3,
+                    "pregunta": "Si quisieras implementar [TÉCNICA DEL MATERIAL], ¿cuál sería el primer paso según lo explicado?",
+                    "opciones": [
+                        "a) [Paso correcto del material]",
+                        "b) [Paso plausible pero en orden incorrecto]",
+                        "c) [Paso de otro proceso similar]",
+                        "d) [Error común de implementación]",
                         "e) No lo sé / Omitir"
                     ],
                     "respuesta_correcta": "a",
-                    "nivel_bloom_evaluado": "Comprender"
+                    "nivel_bloom_evaluado": "Aplicar"
                 }}
             ]
         }}
     }}
     
-    IMPORTANTE:
-    - Las preguntas deben ser ESPECÍFICAS del contenido subido, no genéricas
-    - La opción "e) No lo sé / Omitir" es OBLIGATORIA en todas las preguntas
-    - Genera entre 8-10 preguntas para cubrir bien el material
+    EJEMPLOS CONCRETOS SEGÚN EL DOMINIO DEL MATERIAL:
+    
+    Si el tema es BASES DE DATOS:
+    - Recordar: "¿Qué propiedad garantiza que una transacción se ejecuta completamente o no se ejecuta?"
+    - Comprender: "¿Por qué la normalización 3NF elimina dependencias transitivas?"
+    - Aplicar: "¿Qué tipo de índice usarías para búsquedas de rango en una columna fecha?"
+    - Analizar: "¿Cuál es la diferencia entre INNER JOIN y LEFT JOIN en SQL?"
+    
+    Si el tema es MACHINE LEARNING:
+    - Recordar: "¿Qué es el overfitting según el material?"
+    - Comprender: "¿Por qué el gradient descent puede quedar atrapado en mínimos locales?"
+    - Aplicar: "¿Qué hiperparámetro ajustarías para reducir el overfitting en un árbol de decisión?"
+    - Analizar: "Compara las ventajas de SVM vs Random Forest para clasificación binaria"
+    
+    Si el tema es ARQUITECTURA DE SOFTWARE:
+    - Recordar: "¿Qué patrón de diseño resuelve el problema de crear familias de objetos relacionados?"
+    - Comprender: "Explica por qué el patrón MVC separa la lógica de presentación"
+    - Aplicar: "¿Cómo implementarías un Singleton thread-safe en Java?"
+    - Analizar: "¿En qué se diferencia el patrón Strategy del patrón State?"
+    
+    CRÍTICO: 
+    - Las preguntas deben permitir INFERIR el nivel Bloom del estudiante según:
+      • Respuestas correctas en "Recordar" → Domina hechos y definiciones básicas
+      • Respuestas correctas en "Comprender" → Entiende relaciones causa-efecto
+      • Respuestas correctas en "Aplicar" → Puede usar conocimientos en casos prácticos
+      • Respuestas correctas en "Analizar" → Puede descomponer y comparar conceptos
+      • Respuestas correctas en "Evaluar" → Puede justificar decisiones
+      • Respuestas correctas en "Crear" → Puede diseñar soluciones nuevas
+    
+    - El sistema usará el patrón de aciertos/fallos para determinar la Zona de Desarrollo Próximo (ZDP)
+    - Si el estudiante responde "e) No lo sé / Omitir" se considera como "no domina ese nivel"
     """
+    
     try:
         res = model.generate_content(prompt)
         text_clean = re.sub(r"```json|```", "", res.text).strip()
@@ -276,50 +429,78 @@ def generar_examen_inicial(contenido_total):
 
 
 @retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
-def generar_bloque_ruta(nivel_bloom, textos_nivel):
-    """Genera Flashcards y Exámenes para un nivel específico de Bloom.
-    Se reintenta automáticamente si falla."""
+def generar_bloque_ruta(nivel_bloom, textos_nivel, perfil_zdp=None, marcos=None):
+    """Genera Flashcards y Exámenes para un nivel específico de Bloom usando funciones especializadas.
+    
+    Args:
+        nivel_bloom (str): Nivel cognitivo a generar
+        textos_nivel (list): Contenido del usuario para este nivel
+        perfil_zdp (dict): Perfil ZDP del estudiante (opcional)
+        marcos (dict): Marcos pedagógicos de CSV (opcional)
+    
+    Returns:
+        dict: {"FLASHCARDS": [...], "EXAMENES": [...]} o None si debe omitirse
+        
+    FASE 2: Usa funciones especializadas con teoría pedagógica explícita.
+    """
     if not textos_nivel:
         return None
 
-    texto_combinado = "\n".join(textos_nivel)[:10000]
+    # Importar funciones especializadas
+    from src.generadores_pedagogicos import generar_flashcards_con_teoria, generar_tests_con_teoria
 
-    prompt = f"""
-    Crea material de estudio para el Nivel Cognitivo: {nivel_bloom}.
+    # Determinar estrategia según perfil ZDP
+    estrategia = "estandar"
     
-    TEORÍA DEL FLOW:
-    - El contenido debe ser desafiante pero alcanzable.
-    - Usa un tono dinámico y motivador.
-    
-    TAREAS:
-    1. Genera 3 FLASHCARDS clave para este nivel.
-    2. Genera 1 EXAMEN PROCEDIMENTAL (3 preguntas).
-    
-    CONTENIDO:
-    {texto_combinado}
-    
-    FORMATO JSON OBLIGATORIO:
-    {{
-        "FLASHCARDS": [
-            {{"id": 1, "frente": "Pregunta", "reverso": "Respuesta", "visto": false}}
-        ],
-        "EXAMENES": [
-            {{
-                "id": 1,
-                "pregunta": "...",
-                "opciones": ["..."],
-                "respuesta_correcta": "...",
-                "realizado": false
-            }}
-        ]
-    }}
-    """
+    if perfil_zdp:
+        competentes = perfil_zdp.get("niveles_competentes", [])
+        zona_proxima = perfil_zdp.get("zona_proxima", [])
+        
+        # OMITIR nivel si ya es competente
+        if nivel_bloom in competentes:
+            logger.info(f"⏭️  Omitiendo nivel {nivel_bloom} (ya competente)")
+            return None
+        
+        # Aplicar scaffolding para zona próxima
+        elif nivel_bloom in zona_proxima:
+            estrategia = "scaffolding"
+            logger.info(f"🎯 Generando {nivel_bloom} con SCAFFOLDING (zona próxima)")
+        
+        # Refuerzo intensivo para brechas
+        else:
+            estrategia = "refuerzo"
+            logger.info(f"💪 Generando {nivel_bloom} con REFUERZO (brecha detectada)")
+    else:
+        logger.info(f"📝 Generando {nivel_bloom} con estrategia estándar (sin perfil ZDP)")
+
+    # FASE 2: Generar flashcards y tests con funciones especializadas
     try:
-        res = model.generate_content(prompt)
-        text_clean = re.sub(r"```json|```", "", res.text).strip()
-        return json.loads(text_clean)
+        flashcards = generar_flashcards_con_teoria(
+            nivel_bloom=nivel_bloom,
+            textos_nivel=textos_nivel,
+            estrategia=estrategia,
+            marcos=marcos
+        )
+        
+        tests = generar_tests_con_teoria(
+            nivel_bloom=nivel_bloom,
+            textos_nivel=textos_nivel,
+            estrategia=estrategia,
+            marcos=marcos
+        )
+        
+        # Validar que se generó contenido
+        if not flashcards and not tests:
+            logger.warning(f"⚠️  No se generó contenido para {nivel_bloom}")
+            return None
+        
+        return {
+            "FLASHCARDS": flashcards,
+            "EXAMENES": tests
+        }
+        
     except Exception as e:
-        logger.error(f"⚠️ Error generando bloque {nivel_bloom}: {e}")
+        logger.error(f"❌ Error generando bloque {nivel_bloom}: {e}")
         return None
 
 
@@ -375,23 +556,54 @@ def generar_ruta_aprendizaje(usuario, db):
         # Guardamos en la colección correspondiente
         db[COL_EXAM_INI].replace_one({"usuario": usuario}, doc_examen_ini, upsert=True)
 
-    # 3. Generar Ruta de Aprendizaje (Flow)
+    # NUEVO: Obtener perfil ZDP (si existe evaluación previa)
+    from src.models.evaluacion_zdp import EvaluadorZDP
+    evaluador = EvaluadorZDP()
+    perfil_zdp = evaluador.obtener_perfil_zdp_simple(usuario)
+    
+    if perfil_zdp:
+        logger.info(f"📊 Usando perfil ZDP: Omitiendo {len(perfil_zdp['niveles_competentes'])} niveles competentes")
+    else:
+        logger.info("📝 Sin perfil ZDP previo, generando ruta completa")
+
+    # NUEVO: Cargar marcos pedagógicos (CSV)
+    marcos = cargar_marcos_pedagogicos()
+
+    # 3. Generar Ruta de Aprendizaje ADAPTATIVA (Flow + ZDP)
+    logger.info("🛤️ Diseñando Ruta de Aprendizaje Personalizada...")
+    
     ruta_completa = {}
     secuencia_id = 1
+    niveles_omitidos = []
+    niveles_generados = []
 
     for nivel in JERARQUIA_BLOOM:
         textos = contenido_bloom.get(nivel, [])
         if not textos:
             continue
 
-        bloque_generado = generar_bloque_ruta(nivel, textos)
+        # NUEVO: Pasar perfil_zdp y marcos a generar_bloque_ruta
+        logger.debug(f"   ⚡ Procesando Nivel: {nivel}...")
+        bloque_generado = generar_bloque_ruta(nivel, textos, perfil_zdp, marcos)
 
-        if bloque_generado:
+        if bloque_generado is None:
+            # Nivel omitido (competente)
+            ruta_completa[nivel] = {
+                "id_orden": secuencia_id,
+                "bloqueado": False,  # Desbloqueado pero omitido
+                "estado": "OMITIDO",
+                "razon": "El estudiante ya domina este nivel según evaluación ZDP",
+                "contenido": {"FLASHCARDS": [], "EXAMENES": []}
+            }
+            niveles_omitidos.append(nivel)
+            secuencia_id += 1
+        elif bloque_generado:
             ruta_completa[nivel] = {
                 "id_orden": secuencia_id,
                 "bloqueado": True if secuencia_id > 1 else False,  # El primero desbloqueado
                 "contenido": bloque_generado,
             }
+            niveles_generados.append(nivel)
             secuencia_id += 1
 
     # 4. Guardar Estructura Final en Mongo
@@ -404,13 +616,22 @@ def generar_ruta_aprendizaje(usuario, db):
         },
         "metadatos_ruta": {
             "niveles_incluidos": list(ruta_completa.keys()),
+            "niveles_generados": niveles_generados,
+            "niveles_omitidos": niveles_omitidos,
             "progreso_global": 0,
+            "personalizada_zdp": perfil_zdp is not None,
             "estado_niveles": {
-                nivel: "BLOQUEADO" if data["bloqueado"] else "DISPONIBLE" for nivel, data in ruta_completa.items()
+                nivel: data.get("estado", "BLOQUEADO" if data["bloqueado"] else "DISPONIBLE") 
+                for nivel, data in ruta_completa.items()
             },
         },
         "fecha_actualizacion": datetime.datetime.utcnow(),
     }
+    
+    # Agregar info de perfil ZDP si existe
+    if perfil_zdp:
+        doc_ruta["metadatos_ruta"]["nivel_actual_estudiante"] = perfil_zdp.get("nivel_actual")
+        doc_ruta["metadatos_ruta"]["zona_proxima"] = perfil_zdp.get("zona_proxima", [])
 
     # Si no se generaron bloques (p. ej. contenidos vacíos), usar un fallback mínimo
     if not ruta_completa:
@@ -421,20 +642,34 @@ def generar_ruta_aprendizaje(usuario, db):
 
     col_ruta.replace_one({"usuario": usuario}, doc_ruta, upsert=True)
 
-    return f"Ruta regenerada con {len(ruta_completa)} niveles y Examen Diagnóstico actualizado."
+    # NUEVO: Log con estadísticas de optimización
+    if niveles_omitidos:
+        logger.info(f"✅ Ruta OPTIMIZADA generada:")
+        logger.info(f"   📊 Total niveles: {len(ruta_completa)}")
+        logger.info(f"   ✅ Generados: {len(niveles_generados)} {niveles_generados}")
+        logger.info(f"   ⏭️  Omitidos: {len(niveles_omitidos)} {niveles_omitidos}")
+        logger.info(f"   💰 Ahorro estimado: ~{len(niveles_omitidos) * 40}% tokens")
+        return f"Ruta PERSONALIZADA regenerada ({len(niveles_generados)} niveles activos, {len(niveles_omitidos)} omitidos por dominio)."
+    else:
+        logger.info(f"✅ Ruta completa generada con {len(ruta_completa)} niveles Bloom.")
+        return f"Ruta regenerada con {len(ruta_completa)} niveles y Examen Diagnóstico actualizado."
 
 
 def _crear_examen_minimo():
-    """Crea un examen diagnóstico base cuando no hay contenido Bloom disponible."""
+    """Crea un examen diagnóstico base cuando no hay contenido Bloom disponible.
+    
+    ACTUALIZADO: Ya no usa preguntas meta-cognitivas genéricas.
+    Ahora pide al usuario que describa conceptos básicos del material que subió.
+    """
     preguntas_base = [
         {
             "id": 1,
-            "pregunta": "¿Cuál es el concepto central que identificas en el material subido?",
+            "pregunta": "¿Cuál es el concepto técnico MÁS IMPORTANTE mencionado en tu material?",
             "opciones": [
-                "a) Un concepto técnico específico del área",
-                "b) Un concepto general no relacionado",
-                "c) Un ejemplo aislado",
-                "d) No hay conceptos claros",
+                "a) [Describe brevemente el concepto principal que encontraste]",
+                "b) No identifiqué ningún concepto técnico específico",
+                "c) El material solo tiene información general",
+                "d) No revisé el material completo",
                 "e) No lo sé / Omitir",
             ],
             "respuesta_correcta": "a",
@@ -442,12 +677,12 @@ def _crear_examen_minimo():
         },
         {
             "id": 2,
-            "pregunta": "¿Qué objetivo principal se persigue en el material?",
+            "pregunta": "Según el material, ¿para QUÉ SIRVE o CÓMO FUNCIONA ese concepto principal?",
             "opciones": [
-                "a) Enseñar un proceso o metodología",
-                "b) Presentar datos sin contexto",
-                "c) Listar referencias",
-                "d) No tiene objetivo claro",
+                "a) [Explica brevemente su función o propósito según el texto]",
+                "b) No lo explica claramente",
+                "c) Solo lo menciona sin explicarlo",
+                "d) No entendí su función",
                 "e) No lo sé / Omitir",
             ],
             "respuesta_correcta": "a",
@@ -455,12 +690,12 @@ def _crear_examen_minimo():
         },
         {
             "id": 3,
-            "pregunta": "¿Cómo aplicarías el concepto principal a un caso real?",
+            "pregunta": "Si tuvieras que USAR ese concepto en un proyecto real, ¿qué EJEMPLO concreto mencionó el material?",
             "opciones": [
-                "a) Relacionándolo con un proyecto o problema específico",
-                "b) Repitiendo la definición textualmente",
-                "c) Ignorando el contexto de aplicación",
-                "d) No tiene aplicación práctica",
+                "a) [Describe el ejemplo o caso de uso que mencionó el texto]",
+                "b) No mencionó ejemplos prácticos",
+                "c) Los ejemplos no eran claros",
+                "d) No recuerdo ejemplos específicos",
                 "e) No lo sé / Omitir",
             ],
             "respuesta_correcta": "a",
@@ -468,12 +703,12 @@ def _crear_examen_minimo():
         },
         {
             "id": 4,
-            "pregunta": "¿Qué relación existe entre los conceptos clave del material?",
+            "pregunta": "¿El material menciona DIFERENCIAS o COMPARACIONES entre ese concepto y otros relacionados?",
             "opciones": [
-                "a) Están interconectados formando un sistema",
-                "b) Son conceptos aislados sin relación",
-                "c) Solo se mencionan sin analizar",
-                "d) No hay conceptos clave",
+                "a) Sí, compara con [menciona el otro concepto comparado]",
+                "b) No hace comparaciones",
+                "c) Solo menciona conceptos aislados",
+                "d) No presté atención a las comparaciones",
                 "e) No lo sé / Omitir",
             ],
             "respuesta_correcta": "a",
@@ -481,12 +716,12 @@ def _crear_examen_minimo():
         },
         {
             "id": 5,
-            "pregunta": "¿Qué limitación o área de mejora identificas en tu comprensión actual?",
+            "pregunta": "Según TU criterio y lo leído, ¿cuál es la LIMITACIÓN o DESVENTAJA del concepto principal?",
             "opciones": [
-                "a) Necesito más ejemplos prácticos",
-                "b) Comprendo todo perfectamente",
-                "c) No he revisado el material",
-                "d) El material no tiene limitaciones",
+                "a) [Describe una limitación mencionada o que identificaste]",
+                "b) No tiene limitaciones según el texto",
+                "c) El texto no analiza limitaciones",
+                "d) No puedo identificar limitaciones aún",
                 "e) No lo sé / Omitir",
             ],
             "respuesta_correcta": "a",
@@ -544,98 +779,11 @@ def _crear_ruta_minima(usuario):
     }
 
 
-# --- INTEGRACIÓN CON SISTEMA ZDP (NUEVO) ---
-
-
-def procesar_respuesta_examen_web(usuario, respuestas_estudiante, examen_original):
-    """
-    Procesa las respuestas del examen del estudiante y actualiza su perfil ZDP.
-
-    Args:
-        usuario (str): ID del estudiante
-        respuestas_estudiante (list): Lista de respuestas en formato:
-            [
-                {"pregunta_id": 1, "respuesta": "a", "tiempo_seg": 45},
-                {"pregunta_id": 2, "respuesta": "c", "tiempo_seg": 32},
-                ...
-            ]
-        examen_original (dict): El examen original con respuestas correctas
-
-    Returns:
-        dict: Resultado de evaluación con puntajes y recomendaciones, o dict con error
-    """
-    from src.models.evaluacion_zdp import EvaluadorZDP
-
-    # Validar estructura de respuestas del estudiante
-    is_valid, error_msg = validate_exam_responses(respuestas_estudiante)
-    if not is_valid:
-        logger.warning(f"Invalid exam responses for {usuario}: {error_msg}")
-        return {"error": f"Respuestas inválidas: {error_msg}", "status": 400}
-
-    # Validar estructura del examen original
-    is_valid, error_msg = validate_exam_structure(examen_original)
-    if not is_valid:
-        logger.error(f"Invalid exam structure for {usuario}: {error_msg}")
-        return {"error": f"Estructura de examen inválida: {error_msg}", "status": 400}
-
-    # Validar que el usuario existe
-    if not usuario or not isinstance(usuario, str):
-        logger.warning(f"Invalid usuario parameter: {usuario}")
-        return {"error": "Usuario inválido", "status": 400}
-
-    try:
-        evaluador = EvaluadorZDP()
-        resultado = evaluador.evaluar_examen(usuario, respuestas_estudiante, examen_original)
-        logger.info(f"Exam processed successfully for {usuario}")
-        return resultado
-    except Exception as e:
-        logger.error(f"Error procesando examen para {usuario}: {str(e)}")
-        return {"error": f"Error procesando examen: {str(e)}", "status": 500}
-
-
-def obtener_ruta_personalizada_web(usuario, contenido_disponible):
-    """
-    Obtiene la ruta de aprendizaje personalizada para el estudiante.
-    Omite temas donde ya es competente según su evaluación ZDP.
-
-    Args:
-        usuario (str): ID del estudiante
-        contenido_disponible (str): Contenido educativo disponible
-
-    Returns:
-        dict: Ruta personalizada adaptada a su ZDP
-    """
-    from src.models.evaluacion_zdp import EvaluadorZDP
-
-    try:
-        evaluador = EvaluadorZDP()
-        ruta = evaluador.generar_ruta_personalizada(usuario, contenido_disponible)
-        return ruta
-    except Exception as e:
-        logger.error(f"❌ Error generando ruta personalizada: {e}")
-        return {"error": str(e)}
-
-
-def obtener_perfil_estudiante_zdp(usuario):
-    """
-    Obtiene el perfil ZDP actual del estudiante con sus competencias y recomendaciones.
-
-    Args:
-        usuario (str): ID del estudiante
-
-    Returns:
-        dict: Perfil ZDP completo
-    """
-    from src.models.evaluacion_zdp import obtener_perfil_zdp
-
-    perfil = obtener_perfil_zdp(usuario)
-    if perfil:
-        return perfil
-    return {
-        "usuario": usuario,
-        "estado": "Sin evaluación realizada",
-        "mensaje": "El estudiante aún no ha completado un examen diagnóstico",
-    }
+# --- NOTA: Funciones ZDP movidas a src/models/evaluacion_zdp.py ---
+# Importar directamente desde allí:
+# - evaluar_examen_simple() -> para procesar respuestas
+# - obtener_perfil_zdp() -> para obtener perfil del estudiante
+# - EvaluadorZDP.generar_ruta_personalizada() -> para rutas personalizadas
 
 
 # --- FUNCIONES NUEVAS PARA REDISEÑO DASHBOARD ---

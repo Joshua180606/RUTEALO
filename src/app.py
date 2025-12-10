@@ -18,10 +18,12 @@ from src.web_utils import (
     procesar_archivo_web,
     auto_etiquetar_bloom,
     generar_ruta_aprendizaje,
-    procesar_respuesta_examen_web,
-    obtener_perfil_estudiante_zdp,
     procesar_multiples_archivos_web,
     obtener_rutas_usuario,
+)
+from src.models.evaluacion_zdp import (
+    evaluar_examen_simple as procesar_respuesta_examen_web,
+    obtener_perfil_zdp as obtener_perfil_estudiante_zdp,
 )
 from src.utils import validate_username, validate_password_strength, crear_carpeta_usuario, listar_archivos_usuario, obtener_ruta_archivo
 
@@ -558,11 +560,96 @@ def responder_examen_inicial():
         )
     except Exception as e:
         logger.error(f"No se pudo marcar examen como completado para {usuario}: {e}")
+    
+    # NUEVO: Actualizar metadata de ruta con información ZDP
+    try:
+        # Extraer niveles competentes del resultado
+        competentes = [
+            nivel for nivel, datos in resultado.get("resumen_por_nivel", {}).items()
+            if datos.get("competente", False)
+        ]
+        
+        zona_proxima = resultado.get("zona_proxima", [])
+        
+        # Actualizar metadata de la ruta del usuario
+        db[COLS["RUTAS"]].update_one(
+            {"usuario": usuario},
+            {
+                "$set": {
+                    "metadatos_ruta.niveles_competentes": competentes,
+                    "metadatos_ruta.zona_proxima": zona_proxima,
+                    "metadatos_ruta.personalizada_zdp": True,
+                    "metadatos_ruta.fecha_evaluacion_zdp": datetime.datetime.utcnow()
+                }
+            }
+        )
+        logger.info(f"✅ Metadata ZDP actualizada para {usuario}: competentes={competentes}, ZDP={zona_proxima}")
+    except Exception as e:
+        logger.error(f"⚠️ No se pudo actualizar metadata ZDP en ruta: {e}")
 
     return {"resultado": resultado}, 200
 
 
 # --- NUEVOS ENDPOINTS PARA REDISEÑO DASHBOARD ---
+
+
+@app.route("/api/perfil-zdp")
+def obtener_perfil_zdp_api():
+    """
+    Retorna el perfil ZDP del usuario autenticado.
+    
+    Response:
+        200: {
+            "nivel_actual": str | null,
+            "zona_proxima": [str],
+            "niveles_competentes": [str],
+            "brechas": [str],
+            "puntaje_total": float
+        }
+        401: { "error": "Unauthorized" }
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    usuario = session["usuario"]
+    
+    try:
+        perfil = obtener_perfil_estudiante_zdp(usuario)
+        
+        # Si no hay evaluación previa, retornar vacío
+        if not perfil or perfil.get("estado") == "Sin evaluación realizada":
+            return {
+                "nivel_actual": None,
+                "zona_proxima": [],
+                "niveles_competentes": [],
+                "brechas": [],
+                "puntaje_total": 0
+            }, 200
+        
+        # Extraer niveles competentes (>= 70%)
+        competentes = [
+            nivel for nivel, datos in perfil.get("competencias", {}).items()
+            if datos.get("competente", False)
+        ]
+        
+        # Extraer brechas (< 70%)
+        brechas = [
+            nivel for nivel, datos in perfil.get("competencias", {}).items()
+            if not datos.get("competente", False)
+        ]
+        
+        return {
+            "nivel_actual": perfil.get("nivel_actual"),
+            "zona_proxima": perfil.get("zona_proxima", []),
+            "niveles_competentes": competentes,
+            "brechas": brechas,
+            "puntaje_total": perfil.get("puntaje", 0),
+            "recomendaciones": perfil.get("recomendaciones", [])
+        }, 200
+    
+    except Exception as e:
+        logger.error(f"Error obteniendo perfil ZDP para {usuario}: {e}")
+        return {"error": "Error obteniendo perfil ZDP"}, 500
 
 
 @app.route("/rutas/lista", methods=["GET"])
@@ -974,6 +1061,154 @@ def shutdown_database(exception=None):
     Connection will be closed when the app process itself terminates.
     """
     pass
+
+
+# ==================== ENDPOINTS DEL CHATBOT MULTILINGÜE ====================
+
+@app.route('/api/transcribir-audio', methods=['POST'])
+def transcribir_audio():
+    """
+    Transcribe audio a texto usando OpenAI Whisper API.
+    Soporta 3 idiomas: Español (es), Inglés (en), Quechua (qu)
+    """
+    if 'user' not in session:
+        return jsonify({"error": "No autenticado"}), 401
+    
+    try:
+        # Validar que se envió un archivo
+        if 'audio' not in request.files:
+            return jsonify({"error": "No se envió archivo de audio"}), 400
+        
+        audio_file = request.files['audio']
+        idioma = request.form.get('idioma', 'es')
+        
+        if audio_file.filename == '':
+            return jsonify({"error": "Archivo vacío"}), 400
+        
+        # Validar tamaño (max 10MB)
+        audio_file.seek(0, 2)  # Ir al final
+        size = audio_file.tell()
+        audio_file.seek(0)  # Volver al inicio
+        
+        if size > 10 * 1024 * 1024:
+            return jsonify({"error": "Archivo muy grande (máximo 10MB)"}), 413
+        
+        # Importar OpenAI solo si se usa el endpoint
+        try:
+            from openai import OpenAI
+        except ImportError:
+            return jsonify({
+                "error": "OpenAI no está instalado. Ejecuta: pip install openai>=1.0.0"
+            }), 500
+        
+        # Mapear idiomas a códigos Whisper
+        idioma_map = {
+            'es': 'es',  # Español
+            'en': 'en',  # Inglés
+            'qu': 'qu'   # Quechua
+        }
+        
+        codigo_idioma = idioma_map.get(idioma, 'es')
+        
+        # Obtener API key de OpenAI
+        openai_key = os.getenv('OPENAI_API_KEY')
+        if not openai_key:
+            return jsonify({
+                "error": "OPENAI_API_KEY no configurada. Agrega tu clave en claves.env"
+            }), 500
+        
+        # Transcribir con Whisper
+        client = OpenAI(api_key=openai_key)
+        
+        try:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=codigo_idioma
+            )
+            
+            logger.info(f"Audio transcrito ({idioma}): {transcription.text[:100]}...")
+            
+            return jsonify({
+                "texto": transcription.text,
+                "idioma_detectado": idioma,
+                "exito": True
+            })
+        
+        except Exception as whisper_error:
+            logger.error(f"Error en Whisper API: {whisper_error}")
+            return jsonify({
+                "error": f"Error transcribiendo audio: {str(whisper_error)}"
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error en transcripción de audio: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot():
+    """
+    Chatbot tutor con contexto de ruta en 3 idiomas.
+    Usa Google Gemini para generar respuestas pedagógicas.
+    """
+    if 'user' not in session:
+        return jsonify({"error": "No autenticado"}), 401
+    
+    try:
+        data = request.json
+        mensaje = data.get('mensaje', '').strip()
+        ruta_id = data.get('ruta_id')
+        idioma = data.get('idioma', 'es')
+        historial = data.get('historial', [])
+        
+        # Validaciones
+        if not mensaje:
+            return jsonify({"error": "Mensaje vacío"}), 400
+        
+        if not ruta_id:
+            return jsonify({"error": "No se especificó ruta_id"}), 400
+        
+        if idioma not in ['es', 'en', 'qu']:
+            return jsonify({"error": "Idioma no soportado. Use: es, en, qu"}), 400
+        
+        # Importar y crear tutor con contexto
+        from src.models.chatbot_tutor import TutorVirtual
+        
+        tutor = TutorVirtual(
+            ruta_id=ruta_id,
+            usuario=session['user'],
+            idioma=idioma
+        )
+        
+        # Verificar que se cargó el contexto
+        if not tutor.contexto_ruta:
+            errores = {
+                'es': "No pude cargar el contexto de tu ruta. Verifica que la ruta exista.",
+                'en': "I couldn't load your path context. Verify that the path exists.",
+                'qu': "Manan atinichu kargayta ñanniykita. Qawariykuy ñanniyki kasqanta."
+            }
+            return jsonify({
+                "respuesta": errores.get(idioma, errores['es']),
+                "idioma": idioma,
+                "exito": False
+            })
+        
+        # Generar respuesta
+        logger.info(f"Chatbot ({idioma}): {mensaje[:100]}...")
+        respuesta = tutor.responder(mensaje, historial)
+        
+        logger.info(f"Respuesta generada ({idioma}): {respuesta[:100]}...")
+        
+        return jsonify({
+            "respuesta": respuesta,
+            "idioma": idioma,
+            "exito": True
+        })
+        
+    except Exception as e:
+        logger.error(f"Error en chatbot: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

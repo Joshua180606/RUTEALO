@@ -55,7 +55,8 @@ class DatabaseConnection:
 
             logger.info("Iniciando conexión a MongoDB...")
 
-            # Create client with pooling configuration
+            # Conexión simple sin ServerApi (Python 3.13 incompatible)
+            # SSL configurado en el URI
             self._client = MongoClient(
                 MONGO_URI,
                 maxPoolSize=MONGODB_MAX_POOL_SIZE,
@@ -66,7 +67,7 @@ class DatabaseConnection:
                 serverSelectionTimeoutMS=MONGODB_CONNECT_TIMEOUT,
                 retryWrites=True,
                 retryReads=True,
-                w="majority",  # Wait for majority of replicas to acknowledge
+                w="majority",
             )
 
             # Verify connection with health check

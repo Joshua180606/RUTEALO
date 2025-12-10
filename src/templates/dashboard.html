@@ -28,24 +28,219 @@
     </div>
 </div>
 
+<!-- ==================== SECCIÓN PERFIL ZDP ==================== -->
+<div class="row mt-4 mb-4" id="seccionPerfilZDP" style="display: none;">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-gradient" style="background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">🎯 Tu Perfil de Aprendizaje (Zona de Desarrollo Próximo)</h5>
+                        <small>Basado en tu evaluación diagnóstica</small>
+                    </div>
+                    <button class="btn btn-sm btn-light" onclick="togglePerfilZDP()">
+                        <i class="bi bi-chevron-up" id="iconoToggleZDP"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="contenidoPerfilZDP">
+                <div class="row g-3">
+                    <!-- Nivel Actual -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-primary">
+                            <div class="card-body text-center">
+                                <div class="mb-2" style="font-size: 2rem;">🏆</div>
+                                <h6 class="text-muted mb-2">Nivel Actual</h6>
+                                <h4 class="mb-0" id="nivelActualZDP">-</h4>
+                                <small class="text-muted">Último nivel dominado</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Puntaje Total -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-success">
+                            <div class="card-body text-center">
+                                <div class="mb-2" style="font-size: 2rem;">📊</div>
+                                <h6 class="text-muted mb-2">Puntaje Global</h6>
+                                <h4 class="mb-0" id="puntajeTotalZDP">0%</h4>
+                                <div class="progress mt-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" id="barraProgreso" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zona Próxima -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body text-center">
+                                <div class="mb-2" style="font-size: 2rem;">🎯</div>
+                                <h6 class="text-muted mb-2">Zona de Desarrollo Próximo</h6>
+                                <div id="zonaProximaZDP" class="small">-</div>
+                                <small class="text-muted">Aprende con apoyo</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <!-- Niveles Competentes -->
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <strong>✅ Niveles Dominados</strong>
+                                <small class="float-end" id="countCompetentes">0</small>
+                            </div>
+                            <div class="card-body">
+                                <div id="nivelesCompetentesZDP" class="d-flex flex-wrap gap-2">
+                                    <span class="text-muted">Sin evaluación</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Brechas -->
+                    <div class="col-md-6">
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <strong>💪 Áreas de Refuerzo</strong>
+                                <small class="float-end" id="countBrechas">0</small>
+                            </div>
+                            <div class="card-body">
+                                <div id="brechasZDP" class="d-flex flex-wrap gap-2">
+                                    <span class="text-muted">Sin evaluación</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recomendaciones -->
+                <div class="alert alert-info mt-3 mb-0" id="recomendacionesZDP" style="display: none;">
+                    <strong>📝 Recomendaciones pedagógicas:</strong>
+                    <ul class="mb-0 mt-2" id="listaRecomendaciones"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== CHATBOT TUTOR MULTILINGÜE ==================== -->
+<div class="row mt-4 mb-4" id="seccionChatbot" style="display: none;">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">🤖 Tutor Virtual Personalizado</h5>
+                        <small>Pregunta sobre tu material en 3 idiomas</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Selector de idioma -->
+                        <select id="idiomaChat" class="form-select form-select-sm" style="width: auto; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.5);" onchange="cambiarIdiomaChatbot()">
+                            <option value="es" selected>🇪🇸 Español</option>
+                            <option value="en">🇬🇧 English</option>
+                            <option value="qu">🇵🇪 Quechua</option>
+                        </select>
+                        <button class="btn btn-sm btn-light" onclick="toggleChatbot()">
+                            <i class="bi bi-chevron-up" id="iconoToggleChatbot"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body" id="contenidoChatbot">
+                <!-- Indicador de ruta activa -->
+                <div class="alert alert-light border mb-3" id="infoRutaChatbot">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> 
+                        <span id="mensajeRutaChatbot">Selecciona o crea una ruta para activar el chatbot</span>
+                    </small>
+                </div>
+
+                <!-- Historial de mensajes -->
+                <div class="mb-3" style="background: #f8f9fa; border-radius: 8px; padding: 15px; height: 400px; overflow-y: auto;" id="historialChat">
+                    <!-- Mensaje de bienvenida -->
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-gradient d-flex align-items-center justify-content-center" 
+                                 style="width: 40px; height: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <span style="color: white; font-size: 1.2rem;">🤖</span>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="bg-white rounded p-3 shadow-sm">
+                                <strong class="d-block mb-1" style="color: #667eea;">Tutor Virtual</strong>
+                                <div id="mensajeBienvenida">
+                                    ¡Hola! 👋 Soy tu tutor virtual personalizado. Puedo ayudarte con:
+                                    <ul class="mb-0 mt-2">
+                                        <li>Explicar conceptos de tus flashcards</li>
+                                        <li>Resolver dudas sobre tu material</li>
+                                        <li>Repasar temas del examen diagnóstico</li>
+                                        <li>Sugerir estrategias según tu nivel ZDP</li>
+                                    </ul>
+                                    <small class="text-muted d-block mt-2">
+                                        💡 Escribe o graba tu pregunta abajo
+                                    </small>
+                                </div>
+                            </div>
+                            <small class="text-muted ms-2">Ahora</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Área de entrada -->
+                <div class="row g-2">
+                    <div class="col-12">
+                        <div class="input-group">
+                            <!-- Botón de grabación -->
+                            <button class="btn btn-outline-danger" type="button" id="btnGrabar" onclick="toggleGrabacion()" title="Grabar audio">
+                                <i class="bi bi-mic-fill" id="iconoGrabar"></i>
+                                <span id="estadoGrabacion" class="d-none ms-1">Grabando...</span>
+                            </button>
+                            
+                            <!-- Campo de texto -->
+                            <textarea class="form-control" id="mensajeChat" rows="2" 
+                                      placeholder="Escribe tu pregunta o duda..." 
+                                      onkeypress="if(event.key === 'Enter' && !event.shiftKey){ event.preventDefault(); enviarMensajeChat(); }"></textarea>
+                            
+                            <!-- Botón enviar -->
+                            <button class="btn btn-primary" type="button" id="btnEnviarChat" onclick="enviarMensajeChat()">
+                                <i class="bi bi-send-fill"></i> Enviar
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-lightbulb"></i> Presiona Enter para enviar, Shift+Enter para nueva línea
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Indicador de escritura -->
+                <div class="mt-2 text-muted small" id="indicadorEscritura" style="display: none;">
+                    <i class="bi bi-three-dots"></i> El tutor está escribiendo...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== SECCIÓN RUTA ACTUAL ==================== -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    🛤️ Ruta de Aprendizaje Activa
-                    <div class="small text-muted">Continúa con tu test diagnóstico o contenido</div>
+                <div class="flex-grow-1">
+                    <h5 id="nombreRutaActiva" class="mb-1">🛤️ Ruta de Aprendizaje</h5>
+                    <div id="descripcionRutaActiva" class="small text-muted">Selecciona o crea una ruta para comenzar</div>
                 </div>
                 <div>
-                    <button class="btn btn-outline-secondary btn-sm me-2" id="btnFuentes" onclick="abrirModalFuentes()">
+                    <button class="btn btn-outline-secondary btn-sm" id="btnFuentes" onclick="abrirModalFuentes()">
                         📁 Fuentes
                     </button>
-                    <button class="btn btn-outline-primary" id="btnCargarRuta">Cargar Estado</button>
                 </div>
             </div>
             <div class="card-body" id="rutaAprendizaje">
-                <div class="text-muted">Presiona "Cargar Estado" o crea una nueva ruta para comenzar.</div>
+                <div class="text-muted">Crea una nueva ruta o selecciona una existente desde "Ver Mis Rutas" para comenzar.</div>
             </div>
         </div>
     </div>
@@ -323,6 +518,124 @@
         border-left: 4px solid #ffc107;
         background-color: #fffbf0;
         color: #856404;
+    }
+
+    /* ===== ESTILOS ZDP (ZONA DE DESARROLLO PRÓXIMO) ===== */
+    .nivel-omitido {
+        opacity: 0.75;
+        border-left: 5px solid #28a745 !important;
+        background-color: #f8fff9;
+        transition: opacity 0.3s, transform 0.2s;
+    }
+
+    .nivel-omitido:hover {
+        opacity: 1;
+        transform: translateX(2px);
+    }
+
+    .nivel-prioridad {
+        border-left: 5px solid #ffc107 !important;
+        background: linear-gradient(to right, #fffbf0 0%, #ffffff 100%);
+        box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+        animation: pulse-warning 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warning {
+        0%, 100% { box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2); }
+        50% { box-shadow: 0 4px 16px rgba(255, 193, 7, 0.4); }
+    }
+
+    .nivel-brecha {
+        border-left: 5px solid #dc3545 !important;
+        background-color: #fff5f5;
+    }
+
+    .nivel-normal {
+        border-left: 5px solid #6c757d !important;
+    }
+
+    .badge-zdp {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+
+    .nivel-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+        margin-bottom: 1rem;
+    }
+
+    .nivel-card.collapsed .nivel-body {
+        display: none;
+    }
+
+    .nivel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        user-select: none;
+    }
+
+    .nivel-header:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .toggle-icon {
+        transition: transform 0.3s;
+        font-size: 1.2rem;
+    }
+
+    .nivel-card.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+
+    /* ===== ESTILOS PARA VISUALIZACIÓN DE CONTENIDO ENRIQUECIDO ===== */
+    .badge-teoria-rica {
+        font-size: 0.7rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.3em 0.6em;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    #modalFlashcard .card-body,
+    #modalTest .card-body {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    #modalFlashcard .card-header,
+    #modalTest .card-header {
+        font-weight: 600;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+
+    /* Progreso del perfil ZDP */
+    #barraProgreso {
+        transition: width 0.8s ease-in-out;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .perfil-zdp-card {
+        transition: all 0.3s ease;
+    }
+
+    .perfil-zdp-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Animación de badges */
+    .badge {
+        transition: all 0.2s;
+    }
+
+    .badge:hover {
+        transform: scale(1.05);
     }
 </style>
 
@@ -693,6 +1006,15 @@
                 const rutaData = await res.json();
                 console.log('✅ Ruta cargada:', rutaData);
                 
+                // Actualizar título y descripción con nombre de la ruta
+                const nombreRuta = rutaData.nombre || 'Ruta de Aprendizaje';
+                const descripcionRuta = rutaData.descripcion || 'Continúa con tu test diagnóstico o contenido';
+                document.getElementById('nombreRutaActiva').textContent = `🛤️ ${nombreRuta}`;
+                document.getElementById('descripcionRutaActiva').textContent = descripcionRuta;
+                
+                // Activar chatbot con la ruta cargada
+                activarChatbot(rutaId, nombreRuta);
+                
                 // Renderizar la ruta
                 renderRutaEspecifica(rutaData);
             } catch (error) {
@@ -789,78 +1111,520 @@
                 </div>
             `;
         } else {
-            // PASO 2: Mostrar nivel Bloom actual
-            const nivelActual = nivelesIncluidos[0];
-            const examenesNivel = examenes[nivelActual] || [];
-            const flashcardsNivel = flashcards[nivelActual] || [];
-            
-            const coloresNivel = {
-                'Recordar': '#667eea',
-                'Comprender': '#764ba2',
-                'Aplicar': '#f093fb',
-                'Analizar': '#4facfe',
-                'Evaluar': '#43e97b',
-                'Crear': '#fa709a'
-            };
-            const color = coloresNivel[nivelActual] || '#667eea';
-            
-            html += `
-                <div class="alert alert-success mb-3">
-                    <strong>✅ Test Diagnóstico Completado</strong>
-                    <p class="mb-0 mt-1"><small>Ahora puedes continuar con tu ruta de aprendizaje</small></p>
-                </div>
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header text-white" style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%);">
-                        <h5 class="mb-0">🎓 Nivel Actual: ${escape_html(nivelActual)}</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6 class="mb-3">📝 Tests (${examenesNivel.length})</h6>
-                                ${examenesNivel.length > 0 ? `
-                                    <ul class="list-group">
-                                        ${examenesNivel.slice(0, 3).map((examen, i) => `
-                                            <li class="list-group-item">
-                                                <strong>#${i + 1}</strong>
-                                                <div class="mt-1">${escape_html(examen.pregunta || 'Test sin título').substring(0, 80)}</div>
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                    ${examenesNivel.length > 3 ? `<small class="text-muted d-block mt-2">... y ${examenesNivel.length - 3} más</small>` : ''}
-                                ` : '<p class="text-muted">Sin tests</p>'}
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="mb-3">🃏 Flashcards (${flashcardsNivel.length})</h6>
-                                ${flashcardsNivel.length > 0 ? `
-                                    <ul class="list-group">
-                                        ${flashcardsNivel.slice(0, 3).map((flashcard, i) => `
-                                            <li class="list-group-item">
-                                                <strong>#${i + 1}</strong>
-                                                <div class="mt-1">${escape_html(flashcard.pregunta || flashcard.frente || 'Sin contenido').substring(0, 80)}</div>
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                    ${flashcardsNivel.length > 3 ? `<small class="text-muted d-block mt-2">... y ${flashcardsNivel.length - 3} más</small>` : ''}
-                                ` : '<p class="text-muted">Sin flashcards</p>'}
-                            </div>
+            // PASO 2: Test completado - Cargar perfil ZDP y mostrar todos los niveles
+            fetch('/api/perfil-zdp')
+                .then(res => res.json())
+                .then(perfilZDP => {
+                    html += `
+                        <div class="alert alert-success mb-3">
+                            <strong>✅ Test Diagnóstico Completado</strong>
+                            ${perfilZDP.nivel_actual ? `
+                                <p class="mb-0 mt-1">
+                                    <small>
+                                        <strong>Nivel Actual:</strong> ${escape_html(perfilZDP.nivel_actual)} | 
+                                        <strong>Puntaje:</strong> ${perfilZDP.puntaje_total.toFixed(1)}%
+                                    </small>
+                                </p>
+                            ` : `
+                                <p class="mb-0 mt-1"><small>Ahora puedes continuar con tu ruta de aprendizaje personalizada</small></p>
+                            `}
                         </div>
-                        <div class="mt-4 text-center">
-                            <button class="btn btn-primary btn-lg" onclick="alert('🚧 Funcionalidad en desarrollo')">
-                                🎯 Comenzar Práctica
-                            </button>
+                    `;
+
+                    // Mostrar recomendaciones ZDP si existen
+                    if (perfilZDP.zona_proxima && perfilZDP.zona_proxima.length > 0) {
+                        html += `
+                            <div class="alert alert-warning mb-3">
+                                <strong>🎯 Tu Zona de Desarrollo Próximo:</strong> ${perfilZDP.zona_proxima.join(', ')}
+                                <p class="mb-0 mt-1"><small>Enfócate en estos niveles para un aprendizaje óptimo</small></p>
+                            </div>
+                        `;
+                    }
+
+                    // Renderizar TODOS los niveles con badges ZDP
+                    nivelesIncluidos.forEach(nivel => {
+                        html += renderNivelConBadge(
+                            nivel,
+                            examenes[nivel] || [],
+                            flashcards[nivel] || [],
+                            perfilZDP
+                        );
+                    });
+
+                    cont.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error('Error cargando perfil ZDP:', err);
+                    // Fallback: mostrar sin badges ZDP
+                    html += `
+                        <div class="alert alert-success mb-3">
+                            <strong>✅ Test Diagnóstico Completado</strong>
+                            <p class="mb-0 mt-1"><small>Ahora puedes continuar con tu ruta de aprendizaje</small></p>
                         </div>
-                    </div>
-                </div>
-                ${nivelesIncluidos.length > 1 ? `
-                    <div class="alert alert-info mt-3">
-                        <strong>📚 Próximos niveles:</strong> ${nivelesIncluidos.slice(1).join(', ')}
-                        <p class="mb-0 mt-1"><small>Se desbloquearán al completar el nivel actual</small></p>
-                    </div>
-                ` : ''}
-            `;
+                    `;
+                    nivelesIncluidos.forEach(nivel => {
+                        html += renderNivelConBadge(
+                            nivel,
+                            examenes[nivel] || [],
+                            flashcards[nivel] || [],
+                            {niveles_competentes: [], zona_proxima: [], brechas: []}
+                        );
+                    });
+                    cont.innerHTML = html;
+                });
+            return; // Salir porque el fetch es asíncrono
         }
 
         cont.innerHTML = html;
+    }
+
+    /**
+     * Renderiza un nivel Bloom con su badge ZDP correspondiente
+     * @param {string} nivel - Nombre del nivel Bloom
+     * @param {Array} examenes - Examenes del nivel
+     * @param {Array} flashcards - Flashcards del nivel
+     * @param {Object} perfilZDP - Perfil ZDP del usuario
+     * @returns {string} HTML del nivel
+     */
+    function renderNivelConBadge(nivel, examenes, flashcards, perfilZDP) {
+        const esCompetente = perfilZDP.niveles_competentes?.includes(nivel);
+        const esZonaProxima = perfilZDP.zona_proxima?.includes(nivel);
+        const esBrecha = perfilZDP.brechas?.includes(nivel);
+        
+        // Determinar badge y clase CSS
+        let badge = '';
+        let cssClass = 'nivel-normal';
+        let defaultCollapsed = false;
+        let descripcionZDP = '';
+        
+        if (esCompetente) {
+            badge = '<span class="badge bg-success badge-zdp ms-2">✅ Ya dominas esto</span>';
+            cssClass = 'nivel-omitido';
+            defaultCollapsed = true; // Colapsado por defecto
+            descripcionZDP = '<small class="text-success">Puedes omitir este nivel o repasarlo si lo deseas.</small>';
+        } else if (esZonaProxima) {
+            badge = '<span class="badge bg-warning text-dark badge-zdp ms-2">🎯 Tu Zona Próxima - Enfócate aquí</span>';
+            cssClass = 'nivel-prioridad';
+            defaultCollapsed = false; // Expandido con resaltado
+            descripcionZDP = '<small class="text-warning"><strong>Prioridad alta:</strong> Este es tu nivel óptimo de aprendizaje.</small>';
+        } else if (esBrecha) {
+            badge = '<span class="badge bg-danger badge-zdp ms-2">⚠️ Necesita refuerzo</span>';
+            cssClass = 'nivel-brecha';
+            defaultCollapsed = false;
+            descripcionZDP = '<small class="text-danger">Refuerza este nivel con ejercicios y práctica.</small>';
+        }
+        
+        // Colores por nivel
+        const coloresNivel = {
+            'Recordar': '#667eea',
+            'Comprender': '#764ba2',
+            'Aplicar': '#f093fb',
+            'Analizar': '#4facfe',
+            'Evaluar': '#43e97b',
+            'Crear': '#fa709a'
+        };
+        const color = coloresNivel[nivel] || '#667eea';
+        
+        return `
+            <div class="card nivel-card ${cssClass} shadow-sm ${defaultCollapsed ? 'collapsed' : ''}" 
+                 id="nivel-${nivel.replace(/\s/g, '-')}">
+                <div class="nivel-header card-header" 
+                     onclick="toggleNivel('${nivel.replace(/\s/g, '-')}')" 
+                     style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); color: white;">
+                    <div>
+                        <h5 class="mb-0 d-inline-block">🎓 ${escape_html(nivel)}</h5>
+                        ${badge}
+                        ${descripcionZDP ? `<div class="mt-1">${descripcionZDP}</div>` : ''}
+                    </div>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="card-body nivel-body" style="display: ${defaultCollapsed ? 'none' : 'block'};">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">📝 Tests (${examenes.length})</h6>
+                            ${examenes.length > 0 ? `
+                                <ul class="list-group">
+                                    ${examenes.slice(0, 5).map((examen, i) => {
+                                        const estrategia = determinarEstrategia(esZonaProxima, esBrecha, esCompetente);
+                                        return `
+                                            <li class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <strong>#${i + 1}</strong> ${getIconoEstrategia(estrategia)}
+                                                        <div class="mt-1">${escape_html(examen.pregunta || 'Test sin título')}</div>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-primary" 
+                                                            onclick='verTestCompleto(${JSON.stringify(examen)}, "${nivel}", "${estrategia}")'>
+                                                        👁️ Ver
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ul>
+                                ${examenes.length > 5 ? `<small class="text-muted d-block mt-2">... y ${examenes.length - 5} más</small>` : ''}
+                            ` : '<p class="text-muted">Sin tests disponibles</p>'}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3">🎴 Flashcards (${flashcards.length})</h6>
+                            ${flashcards.length > 0 ? `
+                                <ul class="list-group">
+                                    ${flashcards.slice(0, 5).map((flashcard, i) => {
+                                        const estrategia = determinarEstrategia(esZonaProxima, esBrecha, esCompetente);
+                                        const esTeoriaRica = (flashcard.reverso?.length || 0) > 100;
+                                        return `
+                                            <li class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <strong>#${i + 1}</strong> ${getIconoEstrategia(estrategia)}
+                                                        ${esTeoriaRica ? '<span class="badge bg-info ms-1" title="Contenido enriquecido con teoría">📚 Teoría</span>' : ''}
+                                                        <div class="mt-1">${escape_html(flashcard.pregunta || flashcard.frente || 'Sin contenido')}</div>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-primary" 
+                                                            onclick='verFlashcardCompleta(${JSON.stringify(flashcard)}, "${nivel}", "${estrategia}")'>
+                                                        👁️ Ver
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ul>
+                                ${flashcards.length > 5 ? `<small class="text-muted d-block mt-2">... y ${flashcards.length - 5} más</small>` : ''}
+                            ` : '<p class="text-muted">Sin flashcards disponibles</p>'}
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-primary" onclick="alert('🚧 Funcionalidad en desarrollo')">
+                            🎯 Comenzar Práctica
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Toggle collapse/expand de un nivel
+     */
+    function toggleNivel(nivelId) {
+        const card = document.getElementById(`nivel-${nivelId}`);
+        if (!card) return;
+        
+        const body = card.querySelector('.nivel-body');
+        const isCollapsed = card.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            card.classList.remove('collapsed');
+            body.style.display = 'block';
+        } else {
+            card.classList.add('collapsed');
+            body.style.display = 'none';
+        }
+    }
+
+    /**
+     * Determina la estrategia pedagógica según el perfil ZDP
+     */
+    function determinarEstrategia(esZonaProxima, esBrecha, esCompetente) {
+        if (esCompetente) return 'omitido';
+        if (esZonaProxima) return 'estandar';
+        if (esBrecha) return 'scaffolding';
+        return 'refuerzo';
+    }
+
+    /**
+     * Retorna el ícono según la estrategia
+     */
+    function getIconoEstrategia(estrategia) {
+        const iconos = {
+            'scaffolding': '<span title="Estrategia: Scaffolding (apoyo intensivo)">🎯</span>',
+            'refuerzo': '<span title="Estrategia: Refuerzo">💪</span>',
+            'estandar': '<span title="Estrategia: Estándar">📝</span>',
+            'omitido': '<span title="Nivel omitido (ya dominado)">⏭️</span>'
+        };
+        return iconos[estrategia] || '';
+    }
+
+    /**
+     * Muestra una flashcard completa en un modal
+     */
+    function verFlashcardCompleta(flashcard, nivel, estrategia) {
+        const frente = flashcard.pregunta || flashcard.frente || 'Sin contenido';
+        const reverso = flashcard.respuesta || flashcard.reverso || 'Sin respuesta';
+        const esTeoriaRica = reverso.length > 100;
+        
+        const modalHTML = `
+            <div class="modal fade" id="modalFlashcard" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title">
+                                🎴 Flashcard - ${nivel} ${getIconoEstrategia(estrategia)}
+                                ${esTeoriaRica ? '<span class="badge bg-light text-primary ms-2">📚 Teoría Enriquecida</span>' : ''}
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <strong>🔹 Pregunta/Concepto</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-0">${escape_html(frente)}</p>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <strong>🔸 Respuesta/Explicación</strong>
+                                    ${esTeoriaRica ? '<span class="badge bg-info ms-2">Contenido extenso con teoría</span>' : ''}
+                                </div>
+                                <div class="card-body">
+                                    <p style="white-space: pre-wrap;">${escape_html(reverso)}</p>
+                                </div>
+                            </div>
+                            ${esTeoriaRica ? `
+                                <div class="alert alert-info mt-3">
+                                    <strong>💡 Esta flashcard incluye teoría enriquecida</strong>
+                                    <p class="mb-0">Contiene definiciones, ejemplos y contexto adicional para mejor comprensión.</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remover modal previo si existe
+        const prevModal = document.getElementById('modalFlashcard');
+        if (prevModal) prevModal.remove();
+        
+        // Agregar y mostrar nuevo modal
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const modal = new bootstrap.Modal(document.getElementById('modalFlashcard'));
+        modal.show();
+        
+        // Limpiar al cerrar
+        document.getElementById('modalFlashcard').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    }
+
+    /**
+     * Muestra un test completo con opciones y feedback en un modal
+     */
+    function verTestCompleto(test, nivel, estrategia) {
+        const pregunta = test.pregunta || 'Sin pregunta';
+        const opciones = test.opciones || [];
+        const respuestaCorrecta = test.respuesta_correcta || test.respuesta || '';
+        
+        let opcionesHTML = '';
+        opciones.forEach((opcion, idx) => {
+            const letra = String.fromCharCode(65 + idx); // A, B, C, D
+            const esCorrecta = opcion.texto === respuestaCorrecta || opcion === respuestaCorrecta;
+            const feedback = opcion.feedback || '';
+            const tieneFeedback = feedback.length > 0;
+            
+            opcionesHTML += `
+                <div class="card mb-2 ${esCorrecta ? 'border-success' : ''}">
+                    <div class="card-body py-2">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0">
+                                <span class="badge ${esCorrecta ? 'bg-success' : 'bg-secondary'} me-2">${letra}</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <p class="mb-1">${escape_html(opcion.texto || opcion)}</p>
+                                ${tieneFeedback ? `
+                                    <div class="mt-2 p-2 bg-light rounded">
+                                        <small class="text-muted">
+                                            <strong>💬 Feedback:</strong> ${escape_html(feedback)}
+                                        </small>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            ${esCorrecta ? '<span class="badge bg-success ms-2">✓ Correcta</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        const tieneFeedbackDiferenciado = opciones.some(op => (op.feedback || '').length > 0);
+        
+        const modalHTML = `
+            <div class="modal fade" id="modalTest" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title">
+                                📝 Test - ${nivel} ${getIconoEstrategia(estrategia)}
+                                ${tieneFeedbackDiferenciado ? '<span class="badge bg-light text-success ms-2">💬 Con Feedback</span>' : ''}
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <strong>❓ Pregunta</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-0">${escape_html(pregunta)}</p>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <h6 class="mb-3">📋 Opciones</h6>
+                                ${opcionesHTML}
+                            </div>
+                            ${tieneFeedbackDiferenciado ? `
+                                <div class="alert alert-success">
+                                    <strong>✨ Este test incluye feedback diferenciado</strong>
+                                    <p class="mb-0">Cada opción tiene retroalimentación pedagógica para guiar tu aprendizaje.</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remover modal previo si existe
+        const prevModal = document.getElementById('modalTest');
+        if (prevModal) prevModal.remove();
+        
+        // Agregar y mostrar nuevo modal
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const modal = new bootstrap.Modal(document.getElementById('modalTest'));
+        modal.show();
+        
+        // Limpiar al cerrar
+        document.getElementById('modalTest').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    }
+
+    /**
+     * Renderiza un nivel Bloom con su badge ZDP correspondiente
+     * @param {string} nivel - Nombre del nivel Bloom
+     * @param {Array} examenes - Examenes del nivel
+     * @param {Array} flashcards - Flashcards del nivel
+     * @param {Object} perfilZDP - Perfil ZDP del usuario
+     * @returns {string} HTML del nivel
+     */
+    function renderNivelConBadge(nivel, examenes, flashcards, perfilZDP) {
+        const esCompetente = perfilZDP.niveles_competentes?.includes(nivel);
+        const esZonaProxima = perfilZDP.zona_proxima?.includes(nivel);
+        const esBrecha = perfilZDP.brechas?.includes(nivel);
+        
+        // Determinar badge y clase CSS
+        let badge = '';
+        let cssClass = 'nivel-normal';
+        let defaultCollapsed = false;
+        let descripcionZDP = '';
+        
+        if (esCompetente) {
+            badge = '<span class="badge bg-success badge-zdp ms-2">✅ Ya dominas esto</span>';
+            cssClass = 'nivel-omitido';
+            defaultCollapsed = true; // Colapsado por defecto
+            descripcionZDP = '<small class="text-success">Puedes omitir este nivel o repasarlo si lo deseas.</small>';
+        } else if (esZonaProxima) {
+            badge = '<span class="badge bg-warning text-dark badge-zdp ms-2">🎯 Tu Zona Próxima - Enfócate aquí</span>';
+            cssClass = 'nivel-prioridad';
+            defaultCollapsed = false; // Expandido con resaltado
+            descripcionZDP = '<small class="text-warning"><strong>Prioridad alta:</strong> Este es tu nivel óptimo de aprendizaje.</small>';
+        } else if (esBrecha) {
+            badge = '<span class="badge bg-danger badge-zdp ms-2">⚠️ Necesita refuerzo</span>';
+            cssClass = 'nivel-brecha';
+            defaultCollapsed = false;
+            descripcionZDP = '<small class="text-danger">Refuerza este nivel con ejercicios y práctica.</small>';
+        }
+        
+        // Colores por nivel
+        const coloresNivel = {
+            'Recordar': '#667eea',
+            'Comprender': '#764ba2',
+            'Aplicar': '#f093fb',
+            'Analizar': '#4facfe',
+            'Evaluar': '#43e97b',
+            'Crear': '#fa709a'
+        };
+        const color = coloresNivel[nivel] || '#667eea';
+        
+        return `
+            <div class="card nivel-card ${cssClass} shadow-sm ${defaultCollapsed ? 'collapsed' : ''}" 
+                 id="nivel-${nivel.replace(/\\s/g, '-')}">
+                <div class="nivel-header card-header" 
+                     onclick="toggleNivel('${nivel.replace(/\\s/g, '-')}')" 
+                     style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); color: white;">
+                    <div>
+                        <h5 class="mb-0 d-inline-block">🎓 ${escape_html(nivel)}</h5>
+                        ${badge}
+                        ${descripcionZDP ? `<div class="mt-1">${descripcionZDP}</div>` : ''}
+                    </div>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="card-body nivel-body" style="display: ${defaultCollapsed ? 'none' : 'block'};">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">📝 Tests (${examenes.length})</h6>
+                            ${examenes.length > 0 ? `
+                                <ul class="list-group">
+                                    ${examenes.slice(0, 3).map((examen, i) => `
+                                        <li class="list-group-item">
+                                            <strong>#${i + 1}</strong>
+                                            <div class="mt-1">${escape_html(examen.pregunta || 'Test sin título').substring(0, 80)}...</div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                                ${examenes.length > 3 ? `<small class="text-muted d-block mt-2">... y ${examenes.length - 3} más</small>` : ''}
+                            ` : '<p class="text-muted">Sin tests disponibles</p>'}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3">🃏 Flashcards (${flashcards.length})</h6>
+                            ${flashcards.length > 0 ? `
+                                <ul class="list-group">
+                                    ${flashcards.slice(0, 3).map((flashcard, i) => `
+                                        <li class="list-group-item">
+                                            <strong>#${i + 1}</strong>
+                                            <div class="mt-1">${escape_html(flashcard.pregunta || flashcard.frente || 'Sin contenido').substring(0, 80)}...</div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                                ${flashcards.length > 3 ? `<small class="text-muted d-block mt-2">... y ${flashcards.length - 3} más</small>` : ''}
+                            ` : '<p class="text-muted">Sin flashcards disponibles</p>'}
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-primary" onclick="alert('🚧 Funcionalidad en desarrollo')">
+                            🎯 Comenzar Práctica
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Toggle collapse/expand de un nivel
+     */
+    function toggleNivel(nivelId) {
+        const card = document.getElementById(`nivel-${nivelId}`);
+        if (!card) return;
+        
+        const body = card.querySelector('.nivel-body');
+        const isCollapsed = card.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            card.classList.remove('collapsed');
+            body.style.display = 'block';
+        } else {
+            card.classList.add('collapsed');
+            body.style.display = 'none';
+        }
     }
 
     async function cargarTestInicial() {
@@ -1175,8 +1939,6 @@
     async function cargarEstadoRuta() {
         if (isLoading) return;
         isLoading = true;
-        const btnRuta = document.getElementById('btnCargarRuta');
-        if (btnRuta) btnRuta.disabled = true;
         
         const cont = document.getElementById('rutaAprendizaje');
         cont.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
@@ -1201,7 +1963,6 @@
             cont.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
         } finally {
             isLoading = false;
-            if (btnRuta) btnRuta.disabled = false;
         }
     }
 
@@ -1297,6 +2058,8 @@
                 }
                 // Volver a cargar la ruta (ahora mostrará la ruta personalizada)
                 await cargarEstadoRuta();
+                // Recargar perfil ZDP después de completar examen
+                await cargarPerfilZDP();
                 alert('✅ Examen completado exitosamente. Tu perfil ZDP ha sido actualizado.');
             } catch (error) {
                 alert('❌ Error: ' + error.message);
@@ -1375,11 +2138,87 @@
         cont.innerHTML = html;
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const btnRuta = document.getElementById('btnCargarRuta');
-        if (btnRuta) {
-            btnRuta.addEventListener('click', () => cargarEstadoRuta());
+    // ===== PERFIL ZDP =====
+    async function cargarPerfilZDP() {
+        try {
+            const response = await fetch('/api/perfil-zdp');
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Sin evaluación aún
+                    document.getElementById('seccionPerfilZDP').style.display = 'none';
+                    return;
+                }
+                throw new Error('Error cargando perfil ZDP');
+            }
+
+            const data = await response.json();
+            
+            // Verificar si hay datos válidos
+            if (!data.nivel_actual && (!data.niveles_competentes || data.niveles_competentes.length === 0)) {
+                document.getElementById('seccionPerfilZDP').style.display = 'none';
+                return;
+            }
+
+            // Mostrar sección
+            document.getElementById('seccionPerfilZDP').style.display = 'block';
+
+            // Nivel Actual
+            document.getElementById('nivelActualZDP').textContent = data.nivel_actual || 'Sin evaluar';
+
+            // Puntaje Total
+            const puntaje = Math.round(data.puntaje_total || 0);
+            document.getElementById('puntajeTotalZDP').textContent = puntaje + '%';
+            document.getElementById('barraProgreso').style.width = puntaje + '%';
+
+            // Zona Próxima
+            const zonaProxima = (data.zona_proxima || []).join(', ') || 'Ninguna';
+            document.getElementById('zonaProximaZDP').textContent = zonaProxima;
+
+            // Niveles Competentes (verde)
+            const nivelesCompetentes = data.niveles_competentes || [];
+            const htmlCompetentes = nivelesCompetentes.length > 0 
+                ? nivelesCompetentes.map(n => `<span class="badge bg-success me-1 mb-1">${n}</span>`).join('')
+                : '<span class="text-muted">Ninguno aún</span>';
+            document.getElementById('nivelesCompetentesZDP').innerHTML = htmlCompetentes;
+
+            // Brechas (rojo)
+            const brechas = data.brechas || [];
+            const htmlBrechas = brechas.length > 0
+                ? brechas.map(b => `<span class="badge bg-danger me-1 mb-1">${b}</span>`).join('')
+                : '<span class="text-muted">Ninguna</span>';
+            document.getElementById('brechasZDP').innerHTML = htmlBrechas;
+
+            // Recomendaciones
+            const recomendaciones = data.recomendaciones || [];
+            if (recomendaciones.length > 0) {
+                const htmlRec = recomendaciones.map(r => `<li>${r}</li>`).join('');
+                document.getElementById('listaRecomendaciones').innerHTML = htmlRec;
+                document.getElementById('seccionRecomendaciones').style.display = 'block';
+            } else {
+                document.getElementById('seccionRecomendaciones').style.display = 'none';
+            }
+
+        } catch (error) {
+            console.error('Error cargando perfil ZDP:', error);
+            document.getElementById('seccionPerfilZDP').style.display = 'none';
         }
+    }
+
+    function togglePerfilZDP() {
+        const seccion = document.getElementById('seccionPerfilZDP');
+        if (seccion.style.display === 'none') {
+            cargarPerfilZDP();
+        } else {
+            seccion.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Cargar perfil ZDP al inicio
+        cargarPerfilZDP();
+        
+        // Cargar ruta activa automáticamente al inicio (si existe)
+        cargarEstadoRuta();
     });
 
     // ===== ARCHIVOS (LEGACY) =====
@@ -1457,5 +2296,379 @@
         // Redirigir a descarga
         window.location.href = `/download/${nombreArchivo}`;
     }
+
+    // ==================== FUNCIONES DEL CHATBOT MULTILINGÜE ====================
+    
+    let grabadoraAudio = null;
+    let chunkesAudio = [];
+    let rutaActivaChatbot = null;
+    let historialMensajes = [];
+
+    /**
+     * Toggle visibilidad del chatbot
+     */
+    function toggleChatbot() {
+        const contenido = document.getElementById('contenidoChatbot');
+        const icono = document.getElementById('iconoToggleChatbot');
+        
+        if (contenido.style.display === 'none') {
+            contenido.style.display = 'block';
+            icono.className = 'bi bi-chevron-up';
+        } else {
+            contenido.style.display = 'none';
+            icono.className = 'bi bi-chevron-down';
+        }
+    }
+
+    /**
+     * Cambiar idioma del chatbot y actualizar mensaje de bienvenida
+     */
+    function cambiarIdiomaChatbot() {
+        const idioma = document.getElementById('idiomaChat').value;
+        const mensajeBienvenida = document.getElementById('mensajeBienvenida');
+        
+        const mensajes = {
+            'es': `¡Hola! 👋 Soy tu tutor virtual personalizado. Puedo ayudarte con:
+                <ul class="mb-0 mt-2">
+                    <li>Explicar conceptos de tus flashcards</li>
+                    <li>Resolver dudas sobre tu material</li>
+                    <li>Repasar temas del examen diagnóstico</li>
+                    <li>Sugerir estrategias según tu nivel ZDP</li>
+                </ul>
+                <small class="text-muted d-block mt-2">
+                    💡 Escribe o graba tu pregunta abajo
+                </small>`,
+            'en': `Hello! 👋 I'm your personalized virtual tutor. I can help you with:
+                <ul class="mb-0 mt-2">
+                    <li>Explaining concepts from your flashcards</li>
+                    <li>Answering questions about your materials</li>
+                    <li>Reviewing topics from the diagnostic exam</li>
+                    <li>Suggesting strategies based on your ZPD level</li>
+                </ul>
+                <small class="text-muted d-block mt-2">
+                    💡 Type or record your question below
+                </small>`,
+            'qu': `¡Napaykullayki! 👋 Ñuqaqa kanki yachachiq virtual. Yanapasqayki atini kay:
+                <ul class="mb-0 mt-2">
+                    <li>Yuyaykunata sut'inchanapaq flashcard-niykimanta</li>
+                    <li>Tapukuyniykikunata kutichiy materialniykimanta</li>
+                    <li>Temakunata qhaway examen diagnóstico-manta</li>
+                    <li>Estrategiakunata yuyaychay ZDP nivelniykiman hina</li>
+                </ul>
+                <small class="text-muted d-block mt-2">
+                    💡 Qillqay utaq grabasqa tapukuyniyki (Español/Quechua mixto)
+                </small>`
+        };
+        
+        mensajeBienvenida.innerHTML = mensajes[idioma] || mensajes['es'];
+        
+        // Actualizar placeholder del textarea
+        const placeholders = {
+            'es': 'Escribe tu pregunta o duda...',
+            'en': 'Type your question or doubt...',
+            'qu': 'Qillqay tapukuyniyki (runasimi/castellano)...'
+        };
+        
+        document.getElementById('mensajeChat').placeholder = placeholders[idioma] || placeholders['es'];
+    }
+
+    /**
+     * Activar chatbot cuando se carga una ruta
+     */
+    function activarChatbot(rutaId, nombreRuta) {
+        rutaActivaChatbot = rutaId;
+        
+        const seccionChatbot = document.getElementById('seccionChatbot');
+        const mensajeRuta = document.getElementById('mensajeRutaChatbot');
+        const infoRuta = document.getElementById('infoRutaChatbot');
+        
+        // Mostrar sección de chatbot
+        seccionChatbot.style.display = 'block';
+        
+        // Actualizar mensaje de ruta activa
+        mensajeRuta.innerHTML = `
+            <i class="bi bi-check-circle-fill text-success"></i> 
+            Chatbot activo para: <strong>${nombreRuta}</strong>
+        `;
+        infoRuta.className = 'alert alert-success border mb-3';
+        
+        // Habilitar controles
+        document.getElementById('mensajeChat').disabled = false;
+        document.getElementById('btnEnviarChat').disabled = false;
+        document.getElementById('btnGrabar').disabled = false;
+        
+        console.log('✅ Chatbot activado para ruta:', rutaId);
+    }
+
+    /**
+     * Desactivar chatbot
+     */
+    function desactivarChatbot() {
+        rutaActivaChatbot = null;
+        
+        const mensajeRuta = document.getElementById('mensajeRutaChatbot');
+        const infoRuta = document.getElementById('infoRutaChatbot');
+        
+        mensajeRuta.innerHTML = `
+            <i class="bi bi-info-circle"></i> 
+            Selecciona o crea una ruta para activar el chatbot
+        `;
+        infoRuta.className = 'alert alert-light border mb-3';
+        
+        // Deshabilitar controles
+        document.getElementById('mensajeChat').disabled = true;
+        document.getElementById('btnEnviarChat').disabled = true;
+        document.getElementById('btnGrabar').disabled = true;
+    }
+
+    /**
+     * Toggle grabación de audio
+     */
+    async function toggleGrabacion() {
+        if (!rutaActivaChatbot) {
+            alert('⚠️ Primero selecciona una ruta de aprendizaje');
+            return;
+        }
+
+        const btnGrabar = document.getElementById('btnGrabar');
+        const iconoGrabar = document.getElementById('iconoGrabar');
+        const estadoGrabacion = document.getElementById('estadoGrabacion');
+        
+        if (!grabadoraAudio) {
+            try {
+                // Solicitar permiso de micrófono
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                grabadoraAudio = new MediaRecorder(stream);
+                chunkesAudio = [];
+                
+                grabadoraAudio.ondataavailable = (e) => {
+                    chunkesAudio.push(e.data);
+                };
+                
+                grabadoraAudio.onstop = async () => {
+                    const audioBlob = new Blob(chunkesAudio, { type: 'audio/webm' });
+                    await enviarAudio(audioBlob);
+                    
+                    // Detener stream
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                // Iniciar grabación
+                grabadoraAudio.start();
+                
+                // Actualizar UI
+                btnGrabar.className = 'btn btn-danger';
+                iconoGrabar.className = 'bi bi-stop-fill';
+                estadoGrabacion.classList.remove('d-none');
+                
+                console.log('🎙️ Grabación iniciada');
+                
+            } catch (error) {
+                console.error('Error accediendo al micrófono:', error);
+                alert('❌ No se pudo acceder al micrófono. Verifica los permisos.');
+            }
+        } else {
+            // Detener grabación
+            grabadoraAudio.stop();
+            grabadoraAudio = null;
+            
+            // Restaurar UI
+            btnGrabar.className = 'btn btn-outline-danger';
+            iconoGrabar.className = 'bi bi-mic-fill';
+            estadoGrabacion.classList.add('d-none');
+            
+            console.log('⏹️ Grabación detenida');
+        }
+    }
+
+    /**
+     * Enviar audio para transcripción
+     */
+    async function enviarAudio(audioBlob) {
+        const idioma = document.getElementById('idiomaChat').value;
+        
+        try {
+            // Mostrar mensaje de procesamiento
+            agregarMensajeAlChat('sistema', '🎙️ Transcribiendo audio...', false);
+            
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'grabacion.webm');
+            formData.append('idioma', idioma);
+            
+            const response = await fetch('/api/transcribir-audio', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Error en transcripción');
+            }
+            
+            // Eliminar mensaje de procesamiento
+            const mensajes = document.querySelectorAll('#historialChat .alert-secondary');
+            if (mensajes.length > 0) {
+                mensajes[mensajes.length - 1].remove();
+            }
+            
+            // Mostrar texto transcrito en el textarea
+            document.getElementById('mensajeChat').value = data.texto;
+            
+            // Auto-enviar mensaje
+            await enviarMensajeChat();
+            
+        } catch (error) {
+            console.error('Error transcribiendo audio:', error);
+            alert('❌ Error transcribiendo audio: ' + error.message);
+        }
+    }
+
+    /**
+     * Enviar mensaje de texto al chatbot
+     */
+    async function enviarMensajeChat() {
+        if (!rutaActivaChatbot) {
+            alert('⚠️ Primero selecciona una ruta de aprendizaje');
+            return;
+        }
+
+        const mensajeInput = document.getElementById('mensajeChat');
+        const mensaje = mensajeInput.value.trim();
+        
+        if (!mensaje) {
+            return;
+        }
+        
+        const idioma = document.getElementById('idiomaChat').value;
+        const btnEnviar = document.getElementById('btnEnviarChat');
+        
+        try {
+            // Deshabilitar input
+            mensajeInput.disabled = true;
+            btnEnviar.disabled = true;
+            
+            // Agregar mensaje del usuario
+            agregarMensajeAlChat('usuario', mensaje, true);
+            
+            // Limpiar input
+            mensajeInput.value = '';
+            
+            // Mostrar indicador de escritura
+            document.getElementById('indicadorEscritura').style.display = 'block';
+            
+            // Enviar a API
+            const response = await fetch('/api/chatbot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    mensaje: mensaje,
+                    ruta_id: rutaActivaChatbot,
+                    idioma: idioma,
+                    historial: historialMensajes.slice(-10)  // Últimos 10 mensajes
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Error en chatbot');
+            }
+            
+            // Ocultar indicador
+            document.getElementById('indicadorEscritura').style.display = 'none';
+            
+            // Agregar respuesta del tutor
+            agregarMensajeAlChat('tutor', data.respuesta, true);
+            
+        } catch (error) {
+            console.error('Error enviando mensaje:', error);
+            document.getElementById('indicadorEscritura').style.display = 'none';
+            alert('❌ Error: ' + error.message);
+        } finally {
+            // Rehabilitar input
+            mensajeInput.disabled = false;
+            btnEnviar.disabled = false;
+            mensajeInput.focus();
+        }
+    }
+
+    /**
+     * Agregar mensaje al historial visual
+     * @param {string} tipo - 'usuario', 'tutor', 'sistema'
+     * @param {string} texto - Contenido del mensaje
+     * @param {boolean} guardarEnHistorial - Si se debe guardar en historial de contexto
+     */
+    function agregarMensajeAlChat(tipo, texto, guardarEnHistorial = true) {
+        const historialDiv = document.getElementById('historialChat');
+        const ahora = new Date();
+        const hora = ahora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        
+        let mensajeHTML = '';
+        
+        if (tipo === 'usuario') {
+            mensajeHTML = `
+                <div class="d-flex mb-3 justify-content-end">
+                    <div class="flex-grow-1 me-3 text-end">
+                        <div class="bg-primary text-white rounded p-3 shadow-sm d-inline-block" style="max-width: 80%;">
+                            <strong class="d-block mb-1">Tú</strong>
+                            ${texto.replace(/\n/g, '<br>')}
+                        </div>
+                        <small class="text-muted me-2">${hora}</small>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px;">
+                            <span style="color: white; font-size: 1.2rem;">👤</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (guardarEnHistorial) {
+                historialMensajes.push({ rol: 'usuario', contenido: texto });
+            }
+            
+        } else if (tipo === 'tutor') {
+            mensajeHTML = `
+                <div class="d-flex mb-3">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-circle bg-gradient d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <span style="color: white; font-size: 1.2rem;">🤖</span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="bg-white rounded p-3 shadow-sm" style="max-width: 80%;">
+                            <strong class="d-block mb-1" style="color: #667eea;">Tutor Virtual</strong>
+                            ${texto.replace(/\n/g, '<br>')}
+                        </div>
+                        <small class="text-muted ms-2">${hora}</small>
+                    </div>
+                </div>
+            `;
+            
+            if (guardarEnHistorial) {
+                historialMensajes.push({ rol: 'tutor', contenido: texto });
+            }
+            
+        } else if (tipo === 'sistema') {
+            mensajeHTML = `
+                <div class="alert alert-secondary text-center mb-3 py-2">
+                    <small>${texto}</small>
+                </div>
+            `;
+        }
+        
+        historialDiv.insertAdjacentHTML('beforeend', mensajeHTML);
+        
+        // Auto-scroll al final
+        historialDiv.scrollTop = historialDiv.scrollHeight;
+    }
+
+    // ==================== FIN FUNCIONES CHATBOT ====================
 </script>
 {% endblock %}

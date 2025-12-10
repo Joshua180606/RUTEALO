@@ -40,7 +40,14 @@ COLS = {
 }
 
 # --- GOOGLE GENERATIVE AI ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+# Claves especializadas por función para evitar límites de rate limit
+GOOGLE_API_KEY_IDENTIFICADOR = os.getenv("GOOGLE_API_KEY_IDENTIFICADOR", "")
+GOOGLE_API_KEY_EXAMEN_INICIAL = os.getenv("GOOGLE_API_KEY_EXAMEN_INICIAL", "")
+GOOGLE_API_KEY_RUTEADOR = os.getenv("GOOGLE_API_KEY_RUTEADOR", "")
+GOOGLE_API_KEY_CHATBOT = os.getenv("GOOGLE_API_KEY_CHATBOT", "")
+
+# Clave por defecto (para compatibilidad)
+GOOGLE_API_KEY = GOOGLE_API_KEY_RUTEADOR or GOOGLE_API_KEY_IDENTIFICADOR
 
 # --- FLASK ---
 SECRET_KEY = os.getenv("SECRET_KEY", "RUTEALO_SECRET_KEY_SUPER_SECRETA")
@@ -72,15 +79,41 @@ GENAI_GENERATION_CONFIG = {
 }
 
 
-def get_genai_model():
+def get_genai_model(api_key_type='default'):
     """
-    Retorna la instancia del modelo Gemini configurada.
-    Se inicializa una sola vez con todas las configuraciones centralizadas.
+    Retorna la instancia del modelo Gemini configurada con la clave apropiada.
+    
+    Args:
+        api_key_type (str): Tipo de clave a usar:
+            - 'default': Clave por defecto (RUTEADOR)
+            - 'identificador': Para etiquetado Bloom
+            - 'examen': Para generación de exámenes
+            - 'ruteador': Para generación de rutas
+            - 'chatbot': Para chatbot tutor
+    
+    Returns:
+        GenerativeModel: Modelo configurado
     """
     import google.generativeai as genai
 
-    if GOOGLE_API_KEY:
-        genai.configure(api_key=GOOGLE_API_KEY)
+    # Seleccionar la clave apropiada
+    api_key_map = {
+        'identificador': GOOGLE_API_KEY_IDENTIFICADOR,
+        'examen': GOOGLE_API_KEY_EXAMEN_INICIAL,
+        'ruteador': GOOGLE_API_KEY_RUTEADOR,
+        'chatbot': GOOGLE_API_KEY_CHATBOT,
+        'default': GOOGLE_API_KEY
+    }
+    
+    api_key = api_key_map.get(api_key_type, GOOGLE_API_KEY)
+    
+    if api_key:
+        genai.configure(api_key=api_key)
+    else:
+        raise ValueError(f"No se encontró clave API para tipo: {api_key_type}")
+    
     return genai.GenerativeModel(
-        model_name=GENAI_MODEL_NAME, generation_config=GENAI_GENERATION_CONFIG, safety_settings=GENAI_SAFETY_SETTINGS
+        model_name=GENAI_MODEL_NAME, 
+        generation_config=GENAI_GENERATION_CONFIG, 
+        safety_settings=GENAI_SAFETY_SETTINGS
     )

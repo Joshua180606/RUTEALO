@@ -1,5 +1,20 @@
 # RUTEALO
 
+## 🚀 Novedades: Chatbot Tutor Multilingüe
+
+**¡Nuevo!** RUTEALO ahora incluye un chatbot tutor inteligente con:
+- 🎙️ **Transcripción de audio** en 3 idiomas (Español, Inglés, Quechua)
+- 🤖 **Respuestas contextuales** basadas en tus materiales de estudio
+- 🌍 **Soporte multilingüe** con prompts pedagógicos especializados
+- 📊 **Integración con ZDP** para respuestas adaptadas a tu nivel
+
+**Guías de inicio rápido**:
+- 📋 **[CHECKLIST_RAPIDO.md](./CHECKLIST_RAPIDO.md)** - Activación en 5 minutos
+- 📖 **[INSTRUCCIONES_CHATBOT.md](./INSTRUCCIONES_CHATBOT.md)** - Guía completa de uso
+- 📝 **[RESUMEN_IMPLEMENTACION.md](./RESUMEN_IMPLEMENTACION.md)** - Detalles técnicos
+
+---
+
 ## Instalación ⚙️
 
 Puedes instalar las dependencias del proyecto usando pip con el archivo `requirements.txt` incluido en la raíz del repositorio.
@@ -18,6 +33,26 @@ Para un flujo recomendado en Windows (crea una virtualenv y instala allí autom�
 
 Esto creará una carpeta `.venv` por defecto y luego instalará las dependencias listadas en `requirements.txt`.
 
+### ⚡ Configuración Adicional para el Chatbot
+
+Para usar el chatbot tutor con transcripción de audio:
+
+1. **Instala la dependencia de OpenAI**:
+   ```powershell
+   pip install openai>=1.0.0
+   ```
+
+2. **Configura tu API key de OpenAI**:
+   - Obtén tu clave en: https://platform.openai.com/api-keys
+   - Edita el archivo `claves.env` y agrega:
+     ```env
+     OPENAI_API_KEY="tu_clave_openai_aqui"
+     ```
+
+3. **¡Listo!** Inicia el servidor y el chatbot estará disponible en el dashboard.
+
+Ver **[CHECKLIST_RAPIDO.md](./CHECKLIST_RAPIDO.md)** para instrucciones paso a paso.
+
 ## Ejecutar el procesador de archivos 🗂️
 
 Al ejecutar `src/data/ingesta_datos.py` desde la línea de comando, el script abre una ventana del gestor de archivos para que selecciones manualmente uno o más archivos para procesar (PDF, DOCX o PPTX). Esto evita que el script escanee automáticamente una carpeta y te da control directo sobre qué archivos ingestar.
@@ -34,21 +69,24 @@ Al finalizar el proceso verás en consola el resultado de la ingesta y si un arc
 
 ## 📚 Documentación del Proyecto
 
+### Chatbot Tutor Multilingüe (NUEVO)
+- **[CHECKLIST_RAPIDO.md](./CHECKLIST_RAPIDO.md)** - ⚡ Activación en 5 minutos
+- **[INSTRUCCIONES_CHATBOT.md](./INSTRUCCIONES_CHATBOT.md)** - 📖 Guía completa de uso y testing
+- **[RESUMEN_IMPLEMENTACION.md](./RESUMEN_IMPLEMENTACION.md)** - 📝 Detalles técnicos y arquitectura
+- **[PLAN_CHATBOT_MULTILINGUE.md](./PLAN_CHATBOT_MULTILINGUE.md)** - 📋 Plan de implementación (7 fases)
+
 ### Dashboard (Recientes)
+- **[IMPLEMENTACION_WEB_FASE1_2.md](./IMPLEMENTACION_WEB_FASE1_2.md)** - 🆕 Integración web completa de Fases 1 y 2 (Dashboard ZDP, modales enriquecidos)
 - **[QUICK_REFERENCE_DASHBOARD_20251210.md](./QUICK_REFERENCE_DASHBOARD_20251210.md)** - Referencia rápida de cambios implementados
 - **[RESUMEN_EJECUTIVO_DASHBOARD_20251210.md](./RESUMEN_EJECUTIVO_DASHBOARD_20251210.md)** - Resumen ejecutivo de mejoras
 - **[GUIA_VISUAL_DASHBOARD_20251210.md](./GUIA_VISUAL_DASHBOARD_20251210.md)** - Mockups y guías visuales
 - **[PLAN_IMPLEMENTACION_DASHBOARD_COMPLETO.md](./PLAN_IMPLEMENTACION_DASHBOARD_COMPLETO.md)** - Plan completo con 10 fases futuras
-- **[UPDATE_DASHBOARD_HEIGHT_200px.md](./UPDATE_DASHBOARD_HEIGHT_200px.md)** - Cambios de altura a 200px
 
-### Análisis y Optimizaciones
-- **[RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)** - Hallazgos principales, recomendaciones y estado actual
-- **[ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md](./ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md)** - Análisis técnico detallado de cada issue
-- **[PLAN_IMPLEMENTACION_OPTIMIZACIONES.md](./PLAN_IMPLEMENTACION_OPTIMIZACIONES.md)** - Plan paso a paso con código listo para implementar
-
-### Documentación del Sistema
+### Sistema ZDP y Generadores Pedagógicos
+- **[RESUMEN_EJECUTIVO_FASES_1_2.md](./RESUMEN_EJECUTIVO_FASES_1_2.md)** - 🆕 Resumen completo de optimización ZDP y generadores especializados
+- **[IMPLEMENTACION_FASE2_GENERADORES.md](./IMPLEMENTACION_FASE2_GENERADORES.md)** - 🆕 Generadores pedagógicos con teoría enriquecida (150+ palabras)
+- **[IMPLEMENTACION_FASE1_ZDP_RUTAS.md](./IMPLEMENTACION_FASE1_ZDP_RUTAS.md)** - 🆕 Optimización de rutas con omisión inteligente (40% ahorro tokens)
 - **[SISTEMA_ZDP_DOCUMENTACION.md](./SISTEMA_ZDP_DOCUMENTACION.md)** - Documentación completa del sistema de evaluación ZDP
-- **[SISTEMA_ZDP_DOCUMENTACION.md](./SISTEMA_ZDP_DOCUMENTACION.md)** - Pedagogía, API, ejemplos de uso
 
 ---
 

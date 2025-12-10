@@ -246,6 +246,51 @@ class EvaluadorZDP:
             logger.error(f"❌ Error obteniendo evaluación: {e}")
             return None
 
+    def obtener_perfil_zdp_simple(self, usuario):
+        """Obtiene perfil ZDP resumido para generador de rutas.
+        
+        Returns:
+            dict: {
+                "niveles_competentes": [...],
+                "zona_proxima": [...],
+                "brechas": [...],
+                "nivel_actual": str
+            } o None si no hay evaluación
+        """
+        try:
+            evaluacion = self.obtener_evaluacion_estudiante(usuario)
+            
+            if not evaluacion:
+                logger.info(f"No hay evaluación previa para {usuario}, generando ruta completa")
+                return None
+            
+            # Extraer niveles competentes del resumen
+            competentes = [
+                nivel for nivel, datos in evaluacion.get("resumen_por_nivel", {}).items()
+                if datos.get("competente", False)
+            ]
+            
+            # Calcular brechas (niveles NO competentes)
+            brechas = [
+                nivel for nivel in JERARQUIA_BLOOM 
+                if nivel not in competentes
+            ]
+            
+            perfil = {
+                "niveles_competentes": competentes,
+                "zona_proxima": evaluacion.get("zona_proxima", []),
+                "nivel_actual": evaluacion.get("nivel_actual"),
+                "brechas": brechas,
+                "puntaje_total": evaluacion.get("puntaje_total", 0)
+            }
+            
+            logger.info(f"✅ Perfil ZDP para {usuario}: Competentes={competentes}, Zona={perfil['zona_proxima']}")
+            return perfil
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error obteniendo perfil ZDP simple: {e}")
+            return None
+
     @retry(max_attempts=3, delay=2.0, backoff=2.0, exceptions=(Exception,))
     def generar_ruta_personalizada(self, usuario, material_disponible):
         """
@@ -323,13 +368,56 @@ class EvaluadorZDP:
 
 
 def evaluar_examen_simple(usuario, respuestas, examen):
-    """Función simplificada para evaluar un examen."""
-    evaluador = EvaluadorZDP()
-    return evaluador.evaluar_examen(usuario, respuestas, examen)
+    """
+    Función simplificada para evaluar un examen con validaciones.
+    
+    Args:
+        usuario (str): ID del estudiante
+        respuestas (list): Lista de respuestas del estudiante
+        examen (dict): Examen original con respuestas correctas
+    
+    Returns:
+        dict: Resultado de evaluación o dict con error
+    """
+    from src.utils import validate_exam_responses, validate_exam_structure
+    
+    # Validar estructura de respuestas del estudiante
+    is_valid, error_msg = validate_exam_responses(respuestas)
+    if not is_valid:
+        logger.warning(f"Invalid exam responses for {usuario}: {error_msg}")
+        return {"error": f"Respuestas inválidas: {error_msg}", "status": 400}
+
+    # Validar estructura del examen original
+    is_valid, error_msg = validate_exam_structure(examen)
+    if not is_valid:
+        logger.error(f"Invalid exam structure for {usuario}: {error_msg}")
+        return {"error": f"Estructura de examen inválida: {error_msg}", "status": 400}
+
+    # Validar que el usuario existe
+    if not usuario or not isinstance(usuario, str):
+        logger.warning(f"Invalid usuario parameter: {usuario}")
+        return {"error": "Usuario inválido", "status": 400}
+
+    try:
+        evaluador = EvaluadorZDP()
+        resultado = evaluador.evaluar_examen(usuario, respuestas, examen)
+        logger.info(f"Exam processed successfully for {usuario}")
+        return resultado
+    except Exception as e:
+        logger.error(f"Error procesando examen para {usuario}: {str(e)}")
+        return {"error": f"Error procesando examen: {str(e)}", "status": 500}
 
 
 def obtener_perfil_zdp(usuario):
-    """Obtiene el perfil ZDP actual del estudiante."""
+    """
+    Obtiene el perfil ZDP actual del estudiante.
+    
+    Args:
+        usuario (str): ID del estudiante
+    
+    Returns:
+        dict: Perfil ZDP completo o dict indicando sin evaluación
+    """
     evaluador = EvaluadorZDP()
     evaluacion = evaluador.obtener_evaluacion_estudiante(usuario)
     if evaluacion:
@@ -341,4 +429,8 @@ def obtener_perfil_zdp(usuario):
             "competencias": evaluacion.get("resumen_por_nivel"),
             "recomendaciones": evaluacion.get("recomendaciones"),
         }
-    return None
+    return {
+        "usuario": usuario,
+        "estado": "Sin evaluación realizada",
+        "mensaje": "El estudiante aún no ha completado un examen diagnóstico",
+    }
