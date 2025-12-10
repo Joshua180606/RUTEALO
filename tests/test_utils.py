@@ -16,7 +16,12 @@ from src.utils import (
     log_execution_time,
     minutos_a_horas,
     horas_a_minutos,
-    formatear_tiempo_estudio
+    formatear_tiempo_estudio,
+    obtener_carpeta_usuario,
+    crear_carpeta_usuario,
+    listar_archivos_usuario,
+    validar_acceso_archivo,
+    obtener_ruta_archivo
 )
 
 
@@ -309,4 +314,121 @@ class TestTimeConversions:
         """Debe funcionar con strings."""
         assert formatear_tiempo_estudio("120") == "2 horas"
         assert formatear_tiempo_estudio("90") == "1 hora 30 minutos"
+
+
+class TestFileManagement:
+    """Tests para funciones de manejo de archivos."""
+    
+    def test_obtener_carpeta_usuario(self, tmp_path):
+        """Debe retornar ruta correcta para carpeta del usuario."""
+        resultado = obtener_carpeta_usuario("JOSHUA", str(tmp_path))
+        assert "JOSHUA" in resultado
+        assert resultado.endswith("JOSHUA")
+    
+    def test_crear_carpeta_usuario_success(self, tmp_path):
+        """Debe crear carpeta del usuario correctamente."""
+        resultado = crear_carpeta_usuario("JOSHUA", str(tmp_path))
+        assert resultado is True
+        
+        # Verificar que la carpeta existe
+        import os
+        carpeta = os.path.join(str(tmp_path), "JOSHUA")
+        assert os.path.isdir(carpeta)
+    
+    def test_crear_carpeta_usuario_ya_existe(self, tmp_path):
+        """Debe retornar True si la carpeta ya existe."""
+        crear_carpeta_usuario("USUARIO1", str(tmp_path))
+        resultado = crear_carpeta_usuario("USUARIO1", str(tmp_path))
+        assert resultado is True
+    
+    def test_listar_archivos_usuario_carpeta_vacia(self, tmp_path):
+        """Debe retornar lista vacía si no hay archivos."""
+        crear_carpeta_usuario("USUARIO2", str(tmp_path))
+        archivos = listar_archivos_usuario("USUARIO2", str(tmp_path))
+        assert isinstance(archivos, list)
+        assert len(archivos) == 0
+    
+    def test_listar_archivos_usuario_con_archivos(self, tmp_path):
+        """Debe listar archivos del usuario."""
+        import os
+        
+        # Crear carpeta y archivos
+        crear_carpeta_usuario("USUARIO3", str(tmp_path))
+        carpeta = os.path.join(str(tmp_path), "USUARIO3")
+        
+        # Crear archivos de prueba
+        archivo1 = os.path.join(carpeta, "documento1.pdf")
+        archivo2 = os.path.join(carpeta, "documento2.docx")
+        
+        with open(archivo1, 'w') as f:
+            f.write("contenido pdf")
+        with open(archivo2, 'w') as f:
+            f.write("contenido docx")
+        
+        archivos = listar_archivos_usuario("USUARIO3", str(tmp_path))
+        
+        assert len(archivos) == 2
+        nombres = [a['nombre'] for a in archivos]
+        assert "documento1.pdf" in nombres
+        assert "documento2.docx" in nombres
+        
+        # Verificar estructura de datos
+        for archivo in archivos:
+            assert 'nombre' in archivo
+            assert 'size' in archivo
+            assert 'size_mb' in archivo
+            assert 'fecha' in archivo
+            assert 'ruta' in archivo
+    
+    def test_validar_acceso_archivo_valido(self, tmp_path):
+        """Debe validar acceso a archivo existente."""
+        import os
+        
+        crear_carpeta_usuario("USUARIO4", str(tmp_path))
+        carpeta = os.path.join(str(tmp_path), "USUARIO4")
+        archivo = os.path.join(carpeta, "test.pdf")
+        
+        with open(archivo, 'w') as f:
+            f.write("test")
+        
+        resultado = validar_acceso_archivo("USUARIO4", "test.pdf", str(tmp_path))
+        assert resultado is True
+    
+    def test_validar_acceso_archivo_inexistente(self, tmp_path):
+        """Debe rechazar acceso a archivo inexistente."""
+        crear_carpeta_usuario("USUARIO5", str(tmp_path))
+        resultado = validar_acceso_archivo("USUARIO5", "inexistente.pdf", str(tmp_path))
+        assert resultado is False
+    
+    def test_validar_acceso_archivo_fuera_carpeta(self, tmp_path):
+        """Debe rechazar acceso a archivos fuera de la carpeta del usuario."""
+        import os
+        
+        crear_carpeta_usuario("USUARIO6", str(tmp_path))
+        
+        # Intentar acceder usando ../
+        resultado = validar_acceso_archivo("USUARIO6", "../../../etc/passwd", str(tmp_path))
+        assert resultado is False
+    
+    def test_obtener_ruta_archivo_valido(self, tmp_path):
+        """Debe retornar ruta correcta para archivo válido."""
+        import os
+        
+        crear_carpeta_usuario("USUARIO7", str(tmp_path))
+        carpeta = os.path.join(str(tmp_path), "USUARIO7")
+        archivo = os.path.join(carpeta, "test.pdf")
+        
+        with open(archivo, 'w') as f:
+            f.write("test")
+        
+        ruta = obtener_ruta_archivo("USUARIO7", "test.pdf", str(tmp_path))
+        assert ruta is not None
+        assert os.path.isfile(ruta)
+        assert "test.pdf" in ruta
+    
+    def test_obtener_ruta_archivo_invalido(self, tmp_path):
+        """Debe retornar None si el archivo no es accesible."""
+        crear_carpeta_usuario("USUARIO8", str(tmp_path))
+        ruta = obtener_ruta_archivo("USUARIO8", "inexistente.pdf", str(tmp_path))
+        assert ruta is None
 

@@ -66,3 +66,44 @@ class TestErrorHandling:
         assert app is not None
         assert app.config.get('SECRET_KEY') is not None
 
+
+class TestFileManagement:
+    """Tests para endpoints de manejo de archivos."""
+    
+    def test_files_endpoint_without_session_returns_401(self, client):
+        """GET /files sin sesión debe retornar 401."""
+        response = client.get('/files')
+        assert response.status_code == 401
+        data = response.get_json()
+        assert 'error' in data
+    
+    def test_download_endpoint_without_session_redirects_to_login(self, client):
+        """GET /download/<archivo> sin sesión debe redirigir a login."""
+        response = client.get('/download/test.pdf', follow_redirects=False)
+        assert response.status_code == 302  # Redirect
+        assert '/login' in response.location
+    
+    def test_files_endpoint_returns_json_with_session(self, client):
+        """GET /files con sesión debe retornar JSON válido."""
+        with client.session_transaction() as sess:
+            sess['usuario'] = 'test_user'
+        
+        response = client.get('/files')
+        assert response.status_code == 200
+        data = response.get_json()
+        
+        assert 'usuario' in data
+        assert data['usuario'] == 'test_user'
+        assert 'archivos' in data
+        assert 'total' in data
+        assert isinstance(data['archivos'], list)
+    
+    def test_download_nonexistent_file_redirects_to_dashboard(self, client):
+        """Intentar descargar archivo inexistente debe redirigir."""
+        with client.session_transaction() as sess:
+            sess['usuario'] = 'test_user'
+        
+        response = client.get('/download/nonexistent.pdf', follow_redirects=False)
+        assert response.status_code == 302
+        assert '/dashboard' in response.location
+

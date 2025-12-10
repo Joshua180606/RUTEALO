@@ -402,3 +402,165 @@ def formatear_tiempo_estudio(minutos: int) -> str:
     else:
         return f"{horas} hora{'s' if horas > 1 else ''} {mins_restantes} minutos"
 
+
+# ============================================================================
+# FILE MANAGEMENT UTILITIES
+# ============================================================================
+
+
+import os
+from pathlib import Path
+
+
+def obtener_carpeta_usuario(usuario: str, base_uploads_path: str = None) -> str:
+    """
+    Obtiene la ruta de la carpeta del usuario en data/raw/uploads.
+    
+    Args:
+        usuario (str): Nombre de usuario
+        base_uploads_path (str, optional): Ruta base uploads. Si no proporciona, 
+                                           usa data/raw/uploads relativo
+    
+    Returns:
+        str: Ruta absoluta de la carpeta del usuario
+    
+    Example:
+        >>> obtener_carpeta_usuario("JOSHUA")
+        "C:\\...\\data\\raw\\uploads\\JOSHUA"
+    """
+    if base_uploads_path is None:
+        # Obtener ruta relativa al archivo actual
+        base_path = Path(__file__).parent.parent / "data" / "raw" / "uploads"
+    else:
+        base_path = Path(base_uploads_path)
+    
+    usuario_folder = base_path / usuario
+    return str(usuario_folder)
+
+
+def crear_carpeta_usuario(usuario: str, base_uploads_path: str = None) -> bool:
+    """
+    Crea la carpeta del usuario si no existe.
+    
+    Args:
+        usuario (str): Nombre de usuario
+        base_uploads_path (str, optional): Ruta base uploads
+    
+    Returns:
+        bool: True si se creó o ya existe, False si hay error
+    
+    Example:
+        >>> crear_carpeta_usuario("JOSHUA")
+        True
+    """
+    try:
+        carpeta_usuario = obtener_carpeta_usuario(usuario, base_uploads_path)
+        Path(carpeta_usuario).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Carpeta de usuario creada/verificada: {carpeta_usuario}")
+        return True
+    except Exception as e:
+        logger.error(f"Error creando carpeta de usuario {usuario}: {str(e)}")
+        return False
+
+
+def listar_archivos_usuario(usuario: str, base_uploads_path: str = None) -> list:
+    """
+    Lista todos los archivos del usuario en su carpeta.
+    
+    Args:
+        usuario (str): Nombre de usuario
+        base_uploads_path (str, optional): Ruta base uploads
+    
+    Returns:
+        list: Lista de dicts con info de archivos
+               [{'nombre': 'archivo.pdf', 'size': 1024, 'fecha': '2025-12-09 10:30'}, ...]
+    
+    Example:
+        >>> listar_archivos_usuario("JOSHUA")
+        [{'nombre': 'material.pdf', 'size': 524288, 'fecha': '2025-12-09 10:30:45'}]
+    """
+    carpeta_usuario = obtener_carpeta_usuario(usuario, base_uploads_path)
+    archivos = []
+    
+    try:
+        if not os.path.exists(carpeta_usuario):
+            logger.info(f"Carpeta del usuario {usuario} no existe aún")
+            return archivos
+        
+        for archivo in os.listdir(carpeta_usuario):
+            ruta_archivo = os.path.join(carpeta_usuario, archivo)
+            
+            # Solo archivos, no directorios
+            if os.path.isfile(ruta_archivo):
+                size = os.path.getsize(ruta_archivo)
+                timestamp = os.path.getmtime(ruta_archivo)
+                from datetime import datetime
+                fecha = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                
+                archivos.append({
+                    'nombre': archivo,
+                    'size': size,
+                    'size_mb': round(size / (1024 * 1024), 2),
+                    'fecha': fecha,
+                    'ruta': ruta_archivo
+                })
+        
+        # Ordenar por fecha descendente (más reciente primero)
+        archivos.sort(key=lambda x: x['fecha'], reverse=True)
+        return archivos
+    
+    except Exception as e:
+        logger.error(f"Error listando archivos de {usuario}: {str(e)}")
+        return []
+
+
+def validar_acceso_archivo(usuario: str, nombre_archivo: str, base_uploads_path: str = None) -> bool:
+    """
+    Valida que el usuario tiene acceso al archivo (pertenece a su carpeta).
+    
+    Args:
+        usuario (str): Nombre de usuario
+        nombre_archivo (str): Nombre del archivo a validar
+        base_uploads_path (str, optional): Ruta base uploads
+    
+    Returns:
+        bool: True si el usuario puede acceder al archivo
+    
+    Example:
+        >>> validar_acceso_archivo("JOSHUA", "material.pdf")
+        True
+    """
+    try:
+        carpeta_usuario = obtener_carpeta_usuario(usuario, base_uploads_path)
+        ruta_archivo = os.path.join(carpeta_usuario, nombre_archivo)
+        ruta_real = os.path.realpath(ruta_archivo)
+        carpeta_real = os.path.realpath(carpeta_usuario)
+        
+        # Verificar que la ruta está dentro de la carpeta del usuario
+        return ruta_real.startswith(carpeta_real) and os.path.isfile(ruta_real)
+    except Exception as e:
+        logger.error(f"Error validando acceso de {usuario} a {nombre_archivo}: {str(e)}")
+        return False
+
+
+def obtener_ruta_archivo(usuario: str, nombre_archivo: str, base_uploads_path: str = None) -> Optional[str]:
+    """
+    Obtiene la ruta absoluta del archivo si el usuario tiene acceso.
+    
+    Args:
+        usuario (str): Nombre de usuario
+        nombre_archivo (str): Nombre del archivo
+        base_uploads_path (str, optional): Ruta base uploads
+    
+    Returns:
+        str: Ruta absoluta del archivo, o None si no tiene acceso
+    
+    Example:
+        >>> obtener_ruta_archivo("JOSHUA", "material.pdf")
+        "C:\\...\\data\\raw\\uploads\\JOSHUA\\material.pdf"
+    """
+    if validar_acceso_archivo(usuario, nombre_archivo, base_uploads_path):
+        carpeta_usuario = obtener_carpeta_usuario(usuario, base_uploads_path)
+        return os.path.join(carpeta_usuario, nombre_archivo)
+    return None
+

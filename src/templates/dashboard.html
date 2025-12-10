@@ -11,7 +11,7 @@
                 <p class="text-muted">Sube tus PDFs, PPTX o DOCX. El sistema los procesará y clasificará con IA automáticamente.</p>
                 <form action="/upload" method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <input type="file" name="file" class="form-control" required>
+                        <input type="file" name="file" class="form-control" required accept=".pdf,.docx,.pptx">
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         🚀 Subir y Procesar
@@ -24,8 +24,11 @@
     <!-- Panel Derecho: Archivos y Estado -->
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header bg-white">
-                📂 Mis Materiales
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span>📂 Mis Materiales</span>
+                <button class="btn btn-sm btn-success" id="btnVerArchivos" onclick="cargarArchivosModal()">
+                    📋 Ver Archivos
+                </button>
             </div>
             <div class="card-body">
                 {% if archivos %}
@@ -54,7 +57,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info">Ver</button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="abrirArchivo('{{ archivo.nombre_archivo }}')">Ver</button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -71,4 +74,145 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para ver archivos del usuario -->
+<div class="modal fade" id="modalArchivos" tabindex="-1" aria-labelledby="modalArchivosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalArchivosLabel">📂 Mis Archivos Subidos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalBodyArchivos">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .archivo-item {
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f8f9fa;
+        transition: background-color 0.2s;
+    }
+
+    .archivo-item:hover {
+        background-color: #e9ecef;
+    }
+
+    .archivo-info {
+        flex-grow: 1;
+    }
+
+    .archivo-nombre {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .archivo-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .archivo-size {
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    .archivo-acciones {
+        display: flex;
+        gap: 6px;
+    }
+</style>
+
+<script>
+    function cargarArchivosModal() {
+        // Mostrar modal
+        const modal = new bootstrap.Modal(document.getElementById('modalArchivos'));
+        modal.show();
+
+        // Cargar archivos vía AJAX
+        fetch('/files')
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error('Error cargando archivos');
+                }
+                return response.json();
+            })
+            .then(data => {
+                mostrarArchivosEnModal(data.archivos);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('modalBodyArchivos').innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        Error al cargar los archivos: ${error.message}
+                    </div>
+                `;
+            });
+    }
+
+    function mostrarArchivosEnModal(archivos) {
+        const contenedor = document.getElementById('modalBodyArchivos');
+
+        if (archivos.length === 0) {
+            contenedor.innerHTML = `
+                <div class="alert alert-info" role="alert">
+                    📭 No hay archivos subidos aún. Sube tu primer material usando el formulario.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div class="archivo-lista">';
+        
+        archivos.forEach(archivo => {
+            const fechaFormato = new Date(archivo.fecha).toLocaleString('es-ES');
+            html += `
+                <div class="archivo-item">
+                    <div class="archivo-info">
+                        <div class="archivo-nombre">📄 ${archivo.nombre}</div>
+                        <div class="archivo-meta">
+                            Subido: ${fechaFormato}
+                        </div>
+                        <div class="archivo-size">
+                            Tamaño: ${archivo.size_mb} MB
+                        </div>
+                    </div>
+                    <div class="archivo-acciones">
+                        <a href="/download/${archivo.nombre}" class="btn btn-sm btn-outline-primary" title="Descargar">
+                            ⬇️ Descargar
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        contenedor.innerHTML = html;
+    }
+
+    function abrirArchivo(nombreArchivo) {
+        // Redirigir a descarga
+        window.location.href = `/download/${nombreArchivo}`;
+    }
+</script>
 {% endblock %}

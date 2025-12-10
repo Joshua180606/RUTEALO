@@ -6,7 +6,7 @@ from src.config import COLS, RAW_DIR, SECRET_KEY, DEBUG
 from src.logging_config import setup_logging, get_logger
 from src.database import get_database_connection
 from src.web_utils import get_db, procesar_archivo_web, auto_etiquetar_bloom
-from src.utils import validate_username, validate_password_strength
+from src.utils import validate_username, validate_password_strength, crear_carpeta_usuario, listar_archivos_usuario, obtener_ruta_archivo
 
 # Configurar logging
 is_production = not DEBUG
@@ -254,35 +254,87 @@ def upload_file():
 
     if file:
         try:
+            # Crear carpeta del usuario si no existe
+            usuario = session["usuario"]
+            crear_carpeta_usuario(usuario, str(app.config["UPLOAD_FOLDER"]))
+            
+            # Guardar archivo en la carpeta del usuario
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            usuario_folder = os.path.join(str(app.config["UPLOAD_FOLDER"]), usuario)
+            filepath = os.path.join(usuario_folder, filename)
             file.save(filepath)
 
             # 1. Ingesta (Extraer texto e imágenes)
-            ok, msg = procesar_archivo_web(filepath, session["usuario"], db)
+            ok, msg = procesar_archivo_web(filepath, usuario, db)
 
             if ok:
                 flash(f"Archivo subido e ingestado correctamente ({msg} unidades).", "info")
-                logger.info(f"File uploaded successfully by {session['usuario']}: {filename}")
+                logger.info(f"File uploaded successfully by {usuario}: {filename}")
 
                 # 2. Etiquetado Automático Bloom (IA)
                 flash("Iniciando análisis con IA (Bloom)... esto puede tardar unos segundos.", "warning")
                 try:
-                    processed_count = auto_etiquetar_bloom(session["usuario"], db)
+                    processed_count = auto_etiquetar_bloom(usuario, db)
                     flash(f"Análisis IA completado: {processed_count} documentos etiquetados.", "success")
-                    logger.info(f"Bloom tagging completed for {session['usuario']}: {processed_count} items")
+                    logger.info(f"Bloom tagging completed for {usuario}: {processed_count} items")
                 except Exception as e:
                     flash(f"Error en análisis IA: {e}", "danger")
-                    logger.error(f"Bloom tagging error for {session['usuario']}: {str(e)}")
+                    logger.error(f"Bloom tagging error for {usuario}: {str(e)}")
             else:
                 flash(f"Error procesando archivo: {msg}", "danger")
-                logger.error(f"File processing error for {session['usuario']}: {msg}")
+                logger.error(f"File processing error for {usuario}: {msg}")
 
         except Exception as e:
             flash(f"Error durante la carga: {str(e)}", "danger")
             logger.error(f"Upload error for {session['usuario']}: {str(e)}")
 
     return redirect(url_for("dashboard"))
+
+
+@app.route("/files")
+def list_user_files():
+    """
+    Retorna JSON con lista de archivos del usuario.
+    Endpoint GET para obtener archivos del usuario autenticado.
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+    archivos = listar_archivos_usuario(usuario, str(app.config["UPLOAD_FOLDER"]))
+    
+    return {
+        "usuario": usuario,
+        "archivos": archivos,
+        "total": len(archivos)
+    }, 200
+
+
+@app.route("/download/<archivo>")
+def download_file(archivo):
+    """
+    Descarga un archivo del usuario.
+    Valida que el usuario tenga acceso al archivo antes de descargarlo.
+    """
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+
+    usuario = session["usuario"]
+    ruta_archivo = obtener_ruta_archivo(usuario, archivo, str(app.config["UPLOAD_FOLDER"]))
+    
+    if not ruta_archivo:
+        flash("No tienes acceso a este archivo", "danger")
+        logger.warning(f"Unauthorized download attempt by {usuario} for {archivo}")
+        return redirect(url_for("dashboard"))
+
+    try:
+        from flask import send_file
+        logger.info(f"Download initiated by {usuario}: {archivo}")
+        return send_file(ruta_archivo, as_attachment=True)
+    except Exception as e:
+        flash(f"Error descargando archivo: {str(e)}", "danger")
+        logger.error(f"Download error for {usuario}: {str(e)}")
+        return redirect(url_for("dashboard"))
 
 
 @app.teardown_appcontext
