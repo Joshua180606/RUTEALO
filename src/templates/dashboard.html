@@ -1,92 +1,130 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row">
-    <!-- Panel Izquierdo: Subida -->
-    <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-primary text-white">
-                📥 Subir Material
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Sube tus PDFs, PPTX o DOCX. El sistema los procesará y clasificará con IA automáticamente.</p>
-                <form action="/upload" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <input type="file" name="file" class="form-control" required accept=".pdf,.docx,.pptx">
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        🚀 Subir y Procesar
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
 
-    <!-- Panel Derecho: Archivos y Estado -->
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span>📂 Mis Materiales</span>
-                <button class="btn btn-sm btn-success" id="btnVerArchivos" onclick="cargarArchivosModal()">
-                    📋 Ver Archivos
-                </button>
-            </div>
-            <div class="card-body">
-                {% if archivos %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Archivo</th>
-                                <th>Fecha</th>
-                                <th>Estado</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for archivo in archivos %}
-                            <tr>
-                                <td>{{ archivo.nombre_archivo }}</td>
-                                <td>{{ archivo.fecha_ingesta.strftime('%Y-%m-%d %H:%M') }}</td>
-                                <td>
-                                    {% if archivo.estado_procesamiento == 'BLOOM_COMPLETADO' %}
-                                        <span class="badge bg-success">✅ Analizado</span>
-                                    {% elif archivo.estado_procesamiento == 'PENDIENTE' %}
-                                        <span class="badge bg-warning text-dark">⏳ En cola</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ archivo.estado_procesamiento }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-info" onclick="abrirArchivo('{{ archivo.nombre_archivo }}')">Ver</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+<!-- ==================== SECCIÓN INTRO ==================== -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="card-body p-5">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div style="flex: 1;">
+                        <h2 class="card-title mb-3">🚀 Bienvenido a tu Centro de Aprendizaje Personalizado</h2>
+                        <p class="card-text mb-4" style="font-size: 1.1rem;">
+                            Crea nuevas rutas de aprendizaje basadas en tus materiales o selecciona una ruta existente para continuar tu formación.
+                        </p>
+                        <div class="d-flex gap-3 flex-wrap">
+                            <button type="button" class="btn btn-light btn-lg fw-bold" id="btnCrearRuta" onclick="abrirModalCrearRuta()">
+                                ➕ Crear Nueva Ruta
+                            </button>
+                            <button type="button" class="btn btn-outline-light btn-lg fw-bold" id="btnMisRutas" onclick="abrirModalListaRutas()">
+                                📚 Ver Mis Rutas
+                            </button>
+                        </div>
+                    </div>
+                    <div style="font-size: 5rem; opacity: 0.3;">📖</div>
                 </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <h3>📭</h3>
-                    <p>No has subido ningún material aún.</p>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para ver archivos del usuario -->
-<div class="modal fade" id="modalArchivos" tabindex="-1" aria-labelledby="modalArchivosLabel" aria-hidden="true">
+<!-- ==================== SECCIÓN RUTA ACTUAL ==================== -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    🛤️ Ruta de Aprendizaje Activa
+                    <div class="small text-muted">Continúa con tu test diagnóstico o contenido</div>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary btn-sm me-2" id="btnFuentes" onclick="abrirModalFuentes()">
+                        📁 Fuentes
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnCargarRuta">Cargar Estado</button>
+                </div>
+            </div>
+            <div class="card-body" id="rutaAprendizaje">
+                <div class="text-muted">Presiona "Cargar Estado" o crea una nueva ruta para comenzar.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- ==================== MODAL: CREAR RUTA ==================== -->
+<div class="modal fade" id="modalCrearRuta" tabindex="-1" aria-labelledby="modalCrearRutaLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalArchivosLabel">📂 Mis Archivos Subidos</h5>
+                <h5 class="modal-title" id="modalCrearRutaLabel">➕ Crear Nueva Ruta de Aprendizaje</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="modalBodyArchivos">
-                <div class="text-center">
+            <div class="modal-body">
+                <form id="formCrearRuta" enctype="multipart/form-data">
+                    <!-- Nombre Ruta -->
+                    <div class="mb-3">
+                        <label for="nombreRuta" class="form-label fw-bold">
+                            Nombre de la Ruta <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="nombreRuta" name="nombreRuta" 
+                               placeholder="Ej: Python Avanzado, Estadística Empresarial" 
+                               maxlength="100" required>
+                        <small class="text-muted">Máximo 100 caracteres</small>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="descripcionRuta" class="form-label fw-bold">Descripción</label>
+                        <textarea class="form-control" id="descripcionRuta" name="descripcionRuta" 
+                                  placeholder="Describe brevemente el contenido o propósito de esta ruta..." 
+                                  maxlength="500" rows="3"></textarea>
+                        <small class="text-muted">Máximo 500 caracteres (opcional)</small>
+                    </div>
+
+                    <!-- Seleccionar Archivos -->
+                    <div class="mb-3">
+                        <label for="archivosRuta" class="form-label fw-bold">
+                            Archivos <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" class="form-control" id="archivosRuta" name="archivosRuta" 
+                               accept=".pdf,.docx,.pptx" multiple required>
+                        <small class="text-muted">
+                            Soportados: PDF, DOCX, PPTX | Máximo 50 MB por archivo | Mínimo 1 archivo requerido
+                        </small>
+                        <div id="listadoArchivos" class="mt-2"></div>
+                    </div>
+
+                    <!-- Errores -->
+                    <div id="erroresCreacion" class="alert alert-danger d-none mb-3" role="alert"></div>
+
+                    <!-- Info de Validación -->
+                    <div class="alert alert-info d-none" id="infoValidacion" role="alert"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btnEnviarCrearRuta" onclick="enviarFormularioCrearRuta()">
+                    🚀 Crear Ruta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODAL: LISTA DE RUTAS ==================== -->
+<div class="modal fade" id="modalListaRutas" tabindex="-1" aria-labelledby="modalListaRutasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalListaRutasLabel">📚 Mis Rutas de Aprendizaje</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+                <div id="contenedorListaRutas" class="text-center">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
+                        <span class="visually-hidden">Cargando rutas...</span>
                     </div>
                 </div>
             </div>
@@ -97,7 +135,28 @@
     </div>
 </div>
 
+<!-- ==================== MODAL: FUENTES DE RUTA ==================== -->
+<div class="modal fade" id="modalFuentes" tabindex="-1" aria-labelledby="modalFuentesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFuentesLabel">📁 Archivos Fuente de la Ruta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalBodyFuentes">
+                <div class="text-center">
+                    <p class="text-muted">No hay ruta cargada actualmente</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
+    /* ===== GENERAL ===== */
     .archivo-item {
         padding: 12px;
         border: 1px solid #ddd;
@@ -137,9 +196,1193 @@
         display: flex;
         gap: 6px;
     }
+
+    /* ===== CREAR RUTA MODAL ===== */
+    #listadoArchivos {
+        display: none;
+    }
+
+    .archivo-listado-item {
+        padding: 8px 12px;
+        background-color: #e8f4f8;
+        border-left: 3px solid #0dcaf0;
+        margin-bottom: 6px;
+        border-radius: 3px;
+        font-size: 0.9rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .archivo-listado-item .archivo-tamaño {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+
+    /* ===== LISTA RUTAS MODAL ===== */
+    .ruta-card {
+        border-left: 4px solid #667eea;
+        margin-bottom: 12px;
+        padding: 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .ruta-card:hover {
+        background-color: #e9ecef;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .ruta-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .ruta-card-nombre {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #333;
+    }
+
+    .ruta-card-descripcion {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+
+    .ruta-card-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 0.8rem;
+        color: #495057;
+    }
+
+    .ruta-card-acciones {
+        margin-top: 8px;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .ruta-estado-badge {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+    }
+
+    /* ===== EXAMEN INICIAL ===== */
+    .pregunta-bloom {
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        background-color: #f8f9fa;
+    }
+
+    .pregunta-bloom .nivel-bloom {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    /* ===== UTILIDADES ===== */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+    }
+
+    .error-message {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 4px;
+        border-left: 4px solid #dc3545;
+        background-color: #fff5f5;
+        color: #721c24;
+    }
+
+    .success-message {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 4px;
+        border-left: 4px solid #28a745;
+        background-color: #f1f9f4;
+        color: #155724;
+    }
+
+    .warning-message {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 4px;
+        border-left: 4px solid #ffc107;
+        background-color: #fffbf0;
+        color: #856404;
+    }
 </style>
 
 <script>
+    // ===== FUNCIONES UTILITARIAS =====
+    /**
+     * Escapar caracteres HTML para prevenir XSS
+     */
+    function escape_html(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * Validar nombre de ruta
+     */
+    function validarNombreRuta(nombre) {
+        const errores = [];
+        if (!nombre || nombre.trim() === '') {
+            errores.push('El nombre es requerido');
+        } else if (nombre.length > 100) {
+            errores.push('El nombre no puede exceder 100 caracteres');
+        } else if (nombre.length < 3) {
+            errores.push('El nombre debe tener al menos 3 caracteres');
+        }
+        return { valido: errores.length === 0, errores };
+    }
+
+    /**
+     * Validar descripción de ruta
+     */
+    function validarDescripcion(desc) {
+        const errores = [];
+        if (desc && desc.length > 500) {
+            errores.push('La descripción no puede exceder 500 caracteres');
+        }
+        return { valido: errores.length === 0, errores };
+    }
+
+    /**
+     * Validar archivos
+     */
+    function validarArchivos(archivos) {
+        const errores = [];
+        const extensionesValidas = ['pdf', 'docx', 'pptx'];
+        const sizeLimitBytes = 50 * 1024 * 1024; // 50MB
+
+        if (!archivos || archivos.length === 0) {
+            errores.push('Debes seleccionar al menos 1 archivo');
+            return { valido: false, errores };
+        }
+
+        let totalSize = 0;
+        Array.from(archivos).forEach((file, idx) => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!extensionesValidas.includes(ext)) {
+                errores.push(`Archivo ${idx + 1} (${file.name}): extensión "${ext}" no válida`);
+            }
+            if (file.size > sizeLimitBytes) {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                errores.push(`Archivo ${idx + 1} (${file.name}): ${sizeMB}MB excede el límite de 50MB`);
+            }
+            totalSize += file.size;
+        });
+
+        return { valido: errores.length === 0, errores, totalSize };
+    }
+
+    /**
+     * Mostrar mensaje de error
+     */
+    function mostrarError(contenedor, mensaje) {
+        if (typeof contenedor === 'string') {
+            contenedor = document.getElementById(contenedor);
+        }
+        contenedor.classList.remove('d-none', 'success-message', 'warning-message');
+        contenedor.classList.add('error-message');
+        contenedor.innerHTML = `<strong>❌ Error:</strong> ${escape_html(mensaje)}`;
+        contenedor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /**
+     * Mostrar lista de errores
+     */
+    function mostrarErrores(contenedor, errores) {
+        if (typeof contenedor === 'string') {
+            contenedor = document.getElementById(contenedor);
+        }
+        contenedor.classList.remove('d-none', 'success-message', 'warning-message');
+        contenedor.classList.add('error-message');
+        let html = '<strong>❌ Errores encontrados:</strong><ul class="mb-0 mt-2">';
+        errores.forEach(err => {
+            html += `<li>${escape_html(err)}</li>`;
+        });
+        html += '</ul>';
+        contenedor.innerHTML = html;
+        contenedor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /**
+     * Mostrar mensaje de éxito
+     */
+    function mostrarExito(contenedor, mensaje) {
+        if (typeof contenedor === 'string') {
+            contenedor = document.getElementById(contenedor);
+        }
+        contenedor.classList.remove('d-none', 'error-message', 'warning-message');
+        contenedor.classList.add('success-message');
+        contenedor.innerHTML = `<strong>✅ Éxito:</strong> ${escape_html(mensaje)}`;
+        contenedor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /**
+     * Mostrar advertencia
+     */
+    function mostrarAdvertencia(contenedor, mensaje) {
+        if (typeof contenedor === 'string') {
+            contenedor = document.getElementById(contenedor);
+        }
+        contenedor.classList.remove('d-none', 'error-message', 'success-message');
+        contenedor.classList.add('warning-message');
+        contenedor.innerHTML = `<strong>⚠️ Advertencia:</strong> ${escape_html(mensaje)}`;
+        contenedor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ===== MODAL: CREAR RUTA =====
+    function abrirModalCrearRuta() {
+        document.getElementById('formCrearRuta').reset();
+        document.getElementById('erroresCreacion').classList.add('d-none');
+        document.getElementById('infoValidacion').classList.add('d-none');
+        document.getElementById('listadoArchivos').innerHTML = '';
+        document.getElementById('listadoArchivos').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('modalCrearRuta')).show();
+    }
+
+    // Monitorear cambios en input file
+    document.getElementById('archivosRuta')?.addEventListener('change', function(e) {
+        const archivos = Array.from(e.target.files);
+        const listado = document.getElementById('listadoArchivos');
+        
+        if (archivos.length === 0) {
+            listado.style.display = 'none';
+            return;
+        }
+
+        listado.style.display = 'block';
+        let html = '<strong class="d-block mb-2">Archivos seleccionados:</strong>';
+        let totalSize = 0;
+        
+        archivos.forEach((file, idx) => {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            totalSize += file.size;
+            const isValid = file.type === 'application/pdf' || 
+                          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                          file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+            const sizeValid = file.size <= 52428800; // 50MB
+            const statusIcon = (isValid && sizeValid) ? '✅' : '⚠️';
+            
+            html += `
+                <div class="archivo-listado-item">
+                    <span>${statusIcon} ${file.name}</span>
+                    <span class="archivo-tamaño">${sizeMB} MB</span>
+                </div>
+            `;
+        });
+        
+        listado.innerHTML = html;
+    });
+
+    async function enviarFormularioCrearRuta() {
+        const nombre = document.getElementById('nombreRuta').value.trim();
+        const descripcion = document.getElementById('descripcionRuta').value.trim();
+        const archivosInput = document.getElementById('archivosRuta');
+        const archivos = archivosInput.files;
+        const divErrores = document.getElementById('erroresCreacion');
+
+        // Validar nombre
+        const valNombre = validarNombreRuta(nombre);
+        if (!valNombre.valido) {
+            mostrarErrores('erroresCreacion', valNombre.errores);
+            return;
+        }
+
+        // Validar descripción
+        const valDesc = validarDescripcion(descripcion);
+        if (!valDesc.valido) {
+            mostrarErrores('erroresCreacion', valDesc.errores);
+            return;
+        }
+
+        // Validar archivos
+        const valArchivos = validarArchivos(archivos);
+        if (!valArchivos.valido) {
+            mostrarErrores('erroresCreacion', valArchivos.errores);
+            return;
+        }
+
+        divErrores.classList.add('d-none');
+
+        // Enviar
+        const btn = document.getElementById('btnEnviarCrearRuta');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando...';
+
+        const formData = new FormData();
+        formData.append('nombre_ruta', nombre);
+        formData.append('descripcion', descripcion);
+        Array.from(archivos).forEach((file) => {
+            formData.append('archivos', file);
+        });
+
+        try {
+            const resp = await fetch('/crear-ruta', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                mostrarError('erroresCreacion', data.error || 'Error desconocido del servidor');
+                return;
+            }
+
+            // Éxito
+            mostrarExito('infoValidacion', `Ruta creada con ID: ${escape_html(data.ruta_id)}. Redirigiendo en 2 segundos...`);
+            
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrearRuta'));
+                if (modal) modal.hide();
+                document.getElementById('formCrearRuta').reset();
+                document.getElementById('listadoArchivos').style.display = 'none';
+                document.getElementById('btnCargarRuta').click();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error al crear ruta:', error);
+            mostrarError('erroresCreacion', `Error de conexión: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '🚀 Crear Ruta';
+        }
+    }
+
+    // ===== MODAL: LISTA RUTAS =====
+    function abrirModalListaRutas() {
+        const modal = new bootstrap.Modal(document.getElementById('modalListaRutas'));
+        modal.show();
+        cargarListaRutas();
+    }
+
+    async function cargarListaRutas() {
+        const contenedor = document.getElementById('contenedorListaRutas');
+        contenedor.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
+
+        try {
+            const resp = await fetch('/rutas/lista');
+            if (!resp.ok) {
+                if (resp.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('Error al cargar rutas');
+            }
+
+            const data = await resp.json();
+            renderizarListaRutas(data.rutas || []);
+
+        } catch (error) {
+            contenedor.innerHTML = `<div class="alert alert-danger">❌ Error: ${error.message}</div>`;
+            console.error('Error cargando rutas:', error);
+        }
+    }
+
+    function renderizarListaRutas(rutas) {
+        const contenedor = document.getElementById('contenedorListaRutas');
+
+        if (!rutas || rutas.length === 0) {
+            contenedor.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    📭 No tienes rutas de aprendizaje aún. 
+                    <a href="#" onclick="abrirModalCrearRuta(); return false;" class="alert-link">Crea una nueva</a>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        rutas.forEach(ruta => {
+            const rutaId = escape_html(ruta.ruta_id || '');
+            const nombre = escape_html(ruta.nombre_ruta || 'Sin nombre');
+            const descripcion = escape_html(ruta.descripcion || '');
+            const estado = escape_html(ruta.estado || 'ACTIVA');
+            
+            const estadoBadge = {
+                'ACTIVA': 'success',
+                'PAUSADA': 'warning',
+                'COMPLETADA': 'info'
+            }[estado] || 'secondary';
+
+            const fecha = new Date(ruta.fecha_actualizacion).toLocaleDateString('es-ES');
+            const archivosCount = ruta.archivos_count || 0;
+            const nivelesCompletados = ruta.niveles_completados || 0;
+
+            html += `
+                <div class="ruta-card">
+                    <div class="ruta-card-header">
+                        <span class="ruta-card-nombre">📚 ${nombre}</span>
+                        <span class="badge bg-${estadoBadge} ruta-estado-badge">${estado}</span>
+                    </div>
+                    ${descripcion ? `<div class="ruta-card-descripcion">${descripcion}</div>` : ''}
+                    <div class="ruta-card-meta">
+                        <span>📄 ${archivosCount} archivos</span>
+                        <span>✓ ${nivelesCompletados} niveles</span>
+                        <span>📅 ${fecha}</span>
+                    </div>
+                    <div class="ruta-card-acciones">
+                        <button class="btn btn-sm btn-primary" onclick="continuarRuta('${rutaId}')">
+                            ▶️ Continuar
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="verDetallesRuta('${rutaId}')">
+                            👁️ Detalles
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        contenedor.innerHTML = html;
+    }
+
+    function continuarRuta(rutaId) {
+        // Implementar continuación de ruta existente
+        if (!rutaId || rutaId.trim() === '') {
+            alert('⚠️ ID de ruta inválido');
+            return;
+        }
+
+        // Cerrar modal
+        bootstrap.Modal.getInstance(document.getElementById('modalListaRutas'))?.hide();
+
+        // Simular carga de ruta
+        const cont = document.getElementById('rutaAprendizaje');
+        cont.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando ruta ${rutaId}...</span>
+                </div>
+                <p class="mt-3 text-muted">Cargando contenido de la ruta...</p>
+            </div>
+        `;
+
+        // Cargar contenido de la ruta específica
+        console.log('📖 Continuando ruta:', rutaId);
+
+        setTimeout(async () => {
+            try {
+                const res = await fetch(`/ruta/${rutaId}/contenido`);
+                if (!res.ok) {
+                    throw new Error('No se pudo cargar la ruta');
+                }
+                
+                const rutaData = await res.json();
+                console.log('✅ Ruta cargada:', rutaData);
+                
+                // Renderizar la ruta
+                renderRutaEspecifica(rutaData);
+            } catch (error) {
+                console.error('❌ Error al cargar ruta:', error);
+                document.getElementById('rutaAprendizaje').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Error al cargar la ruta</h5>
+                        <p>${escape_html(error.message)}</p>
+                        <button class="btn btn-sm btn-outline-danger" onclick="abrirModalListaRutas()">
+                            ← Volver a Mis Rutas
+                        </button>
+                    </div>
+                `;
+            }
+        }, 1000);
+    }
+
+    // Variable global para almacenar ruta actual
+    let rutaActualCargada = null;
+
+    function renderRutaEspecifica(rutaData) {
+        const cont = document.getElementById('rutaAprendizaje');
+        rutaActualCargada = rutaData; // Guardar para modal de fuentes
+        
+        // Validar estructura
+        if (!rutaData.estructura || !rutaData.metadatos) {
+            cont.innerHTML = `
+                <div class="alert alert-warning">
+                    <h5>⚠️ Ruta sin contenido</h5>
+                    <p>Esta ruta no tiene estructura generada todavía.</p>
+                    <p class="mb-0"><strong>Ruta:</strong> ${escape_html(rutaData.nombre)}</p>
+                </div>
+            `;
+            return;
+        }
+
+        const nivelesIncluidos = rutaData.metadatos.niveles_incluidos || [];
+        const examenes = rutaData.estructura.examenes || {};
+        const flashcards = rutaData.estructura.flashcards || {};
+        const testInicial = rutaData.test_inicial;
+
+        if (nivelesIncluidos.length === 0) {
+            cont.innerHTML = `
+                <div class="alert alert-warning">
+                    <h5>⚠️ Ruta vacía</h5>
+                    <p>No se generaron niveles de aprendizaje para esta ruta.</p>
+                    <p class="mb-0"><strong>Ruta:</strong> ${escape_html(rutaData.nombre)}</p>
+                </div>
+            `;
+            return;
+        }
+
+        // LÓGICA PROGRESIVA: Mostrar solo el paso actual
+        let html = `
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <h3 class="mb-2">🎯 ${escape_html(rutaData.nombre)}</h3>
+                    <p class="text-muted mb-3">${escape_html(rutaData.descripcion || '')}</p>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge bg-primary">${escape_html(rutaData.estado)}</span>
+                        <span class="badge bg-info text-dark">${nivelesIncluidos.length} niveles Bloom</span>
+                        <span class="badge bg-secondary">Progreso: ${rutaData.metadatos.progreso_global || 0}%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // PASO 1: Test inicial pendiente
+        if (!testInicial || testInicial.estado !== 'COMPLETADO') {
+            html += `
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">📋 Paso 1: Test Diagnóstico (Obligatorio)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Antes de comenzar tu ruta de aprendizaje, debes completar el <strong>Test Diagnóstico</strong> que nos ayudará a identificar tu Zona de Desarrollo Próximo (ZDP).</p>
+                        ${testInicial ? `
+                            <p class="mb-2"><small class="text-muted">Test generado: ${testInicial.preguntas || 0} preguntas | Origen: ${escape_html(testInicial.origen || 'IA')}</small></p>
+                            ${testInicial.origen === 'fallback_sin_bloom' ? `
+                                <div class="alert alert-info mb-3">
+                                    <small>⚠️ Este test es genérico. <strong>Regenera el test</strong> para obtener preguntas específicas de tu material.</small>
+                                </div>
+                            ` : ''}
+                        ` : ''}
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-warning" onclick="cargarTestInicial()">
+                                🚀 Comenzar Test Diagnóstico
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="regenerarTest()" title="Regenerar test con preguntas basadas en tu material">
+                                🔄 Regenerar Test
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // PASO 2: Mostrar nivel Bloom actual
+            const nivelActual = nivelesIncluidos[0];
+            const examenesNivel = examenes[nivelActual] || [];
+            const flashcardsNivel = flashcards[nivelActual] || [];
+            
+            const coloresNivel = {
+                'Recordar': '#667eea',
+                'Comprender': '#764ba2',
+                'Aplicar': '#f093fb',
+                'Analizar': '#4facfe',
+                'Evaluar': '#43e97b',
+                'Crear': '#fa709a'
+            };
+            const color = coloresNivel[nivelActual] || '#667eea';
+            
+            html += `
+                <div class="alert alert-success mb-3">
+                    <strong>✅ Test Diagnóstico Completado</strong>
+                    <p class="mb-0 mt-1"><small>Ahora puedes continuar con tu ruta de aprendizaje</small></p>
+                </div>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%);">
+                        <h5 class="mb-0">🎓 Nivel Actual: ${escape_html(nivelActual)}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="mb-3">📝 Tests (${examenesNivel.length})</h6>
+                                ${examenesNivel.length > 0 ? `
+                                    <ul class="list-group">
+                                        ${examenesNivel.slice(0, 3).map((examen, i) => `
+                                            <li class="list-group-item">
+                                                <strong>#${i + 1}</strong>
+                                                <div class="mt-1">${escape_html(examen.pregunta || 'Test sin título').substring(0, 80)}</div>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                    ${examenesNivel.length > 3 ? `<small class="text-muted d-block mt-2">... y ${examenesNivel.length - 3} más</small>` : ''}
+                                ` : '<p class="text-muted">Sin tests</p>'}
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="mb-3">🃏 Flashcards (${flashcardsNivel.length})</h6>
+                                ${flashcardsNivel.length > 0 ? `
+                                    <ul class="list-group">
+                                        ${flashcardsNivel.slice(0, 3).map((flashcard, i) => `
+                                            <li class="list-group-item">
+                                                <strong>#${i + 1}</strong>
+                                                <div class="mt-1">${escape_html(flashcard.pregunta || flashcard.frente || 'Sin contenido').substring(0, 80)}</div>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                    ${flashcardsNivel.length > 3 ? `<small class="text-muted d-block mt-2">... y ${flashcardsNivel.length - 3} más</small>` : ''}
+                                ` : '<p class="text-muted">Sin flashcards</p>'}
+                            </div>
+                        </div>
+                        <div class="mt-4 text-center">
+                            <button class="btn btn-primary btn-lg" onclick="alert('🚧 Funcionalidad en desarrollo')">
+                                🎯 Comenzar Práctica
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${nivelesIncluidos.length > 1 ? `
+                    <div class="alert alert-info mt-3">
+                        <strong>📚 Próximos niveles:</strong> ${nivelesIncluidos.slice(1).join(', ')}
+                        <p class="mb-0 mt-1"><small>Se desbloquearán al completar el nivel actual</small></p>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        cont.innerHTML = html;
+    }
+
+    async function cargarTestInicial() {
+        const cont = document.getElementById('rutaAprendizaje');
+        cont.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Cargando test...</p></div>';
+        
+        try {
+            const res = await fetch('/examen-inicial');
+            if (!res.ok) throw new Error('No se pudo cargar el test');
+            
+            const testData = await res.json();
+            renderTestInicial(testData.contenido);
+        } catch (error) {
+            console.error('Error:', error);
+            cont.innerHTML = `<div class="alert alert-danger">Error: ${escape_html(error.message)}</div>`;
+        }
+    }
+
+    function renderTestInicial(contenido) {
+        const preguntas = (contenido?.EXAMENES?.EXAMEN_INICIAL) || [];
+        const cont = document.getElementById('rutaAprendizaje');
+        
+        if (!preguntas.length) {
+            cont.innerHTML = '<div class="alert alert-warning">No hay preguntas disponibles</div>';
+            return;
+        }
+        
+        let html = `
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📋 Test Diagnóstico - ZDP</h5>
+                    <small>${preguntas.length} preguntas</small>
+                </div>
+                <div class="card-body">
+                    <form id="formTestInicial">
+        `;
+        
+        preguntas.forEach((p, idx) => {
+            html += `
+                <div class="mb-4 p-3 border rounded">
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong>Pregunta ${idx + 1}</strong>
+                        <span class="badge bg-info">${escape_html(p.nivel_bloom_evaluado || 'General')}</span>
+                    </div>
+                    <p>${escape_html(p.pregunta)}</p>
+            `;
+            
+            if (p.opciones) {
+                p.opciones.forEach((op, opIdx) => {
+                    const letra = String.fromCharCode(97 + opIdx);
+                    html += `
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="preg_${p.id}" value="${letra}" id="p${p.id}_${letra}" required>
+                            <label class="form-check-label" for="p${p.id}_${letra}">${escape_html(op)}</label>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += '</div>';
+        });
+        
+        html += `
+                    <button type="submit" class="btn btn-primary btn-lg w-100">✓ Enviar Test</button>
+                </form>
+            </div>
+        </div>
+        `;
+        
+        cont.innerHTML = html;
+        
+        document.getElementById('formTestInicial').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const respuestas = [];
+            preguntas.forEach(p => {
+                const selected = document.querySelector(`input[name="preg_${p.id}"]:checked`);
+                if (selected) respuestas.push({ id: p.id, respuesta: selected.value });
+            });
+            
+            if (respuestas.length < preguntas.length) {
+                alert('⚠️ Por favor responde todas las preguntas');
+                return;
+            }
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+            
+            try {
+                const res = await fetch('/calificar-examen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ respuestas })
+                });
+                
+                if (!res.ok) throw new Error('Error al calificar');
+                
+                const result = await res.json();
+                mostrarExito(`✅ Test completado: ${result.aprobadas}/${result.total} correctas`);
+                
+                setTimeout(() => {
+                    if (rutaActualCargada) {
+                        continuarRuta(rutaActualCargada.ruta_id);
+                    }
+                }, 2000);
+            } catch (error) {
+                mostrarError(`Error: ${error.message}`);
+                btn.disabled = false;
+                btn.innerHTML = '✓ Enviar Test';
+            }
+        });
+    }
+
+    async function regenerarTest() {
+        if (!rutaActualCargada) {
+            mostrarAdvertencia('⚠️ No hay ruta cargada. Selecciona una ruta primero.');
+            return;
+        }
+        
+        if (!confirm('¿Regenerar el test diagnóstico? Esto creará nuevas preguntas basadas en tu material. El test actual se reemplazará.')) {
+            return;
+        }
+        
+        mostrarAdvertencia('🔄 Regenerando test... Esto puede tardar 20-30 segundos.');
+        
+        try {
+            const res = await fetch(`/ruta/${rutaActualCargada.ruta_id}/regenerar-test`, {
+                method: 'POST'
+            });
+            
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Error al regenerar test');
+            }
+            
+            const result = await res.json();
+            mostrarExito(`✅ ${result.mensaje}`);
+            
+            // Recargar la ruta para ver el nuevo test
+            setTimeout(() => {
+                continuarRuta(rutaActualCargada.ruta_id);
+            }, 2000);
+        } catch (error) {
+            console.error('Error regenerando test:', error);
+            mostrarError(`❌ Error: ${error.message}`);
+        }
+    }
+
+    async function abrirModalFuentes() {
+        if (!rutaActualCargada) {
+            mostrarAdvertencia('⚠️ No hay ruta cargada. Selecciona una ruta primero.');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('modalFuentes'));
+        const body = document.getElementById('modalBodyFuentes');
+        
+        body.innerHTML = '<div class="text-center"><div class="spinner-border text-primary"></div></div>';
+        modal.show();
+        
+        try {
+            const res = await fetch(`/ruta/${rutaActualCargada.ruta_id}/fuentes`);
+            if (!res.ok) throw new Error('No se pudieron cargar las fuentes');
+            
+            const data = await res.json();
+            
+            if (!data.archivos || data.archivos.length === 0) {
+                body.innerHTML = '<p class="text-muted text-center">No hay archivos fuente</p>';
+                return;
+            }
+            
+            let html = `
+                <h6 class="mb-3">📁 ${escape_html(data.nombre_ruta)} (${data.total} archivos)</h6>
+                <ul class="list-group">
+            `;
+            
+            data.archivos.forEach(archivo => {
+                html += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${escape_html(archivo.nombre_archivo)}</strong>
+                                <div><small class="text-muted">${archivo.tamaño ? archivo.tamaño.toFixed(2) + ' MB' : 'N/A'}</small></div>
+                            </div>
+                            <span class="badge bg-secondary">${escape_html(archivo.tipo || 'unknown')}</span>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            html += '</ul>';
+            body.innerHTML = html;
+        } catch (error) {
+            body.innerHTML = `<div class="alert alert-danger">Error: ${escape_html(error.message)}</div>`;
+        }
+    }
+
+    // ===== LEGACY: Mantener para compatibilidad =====
+    function verDetallesRuta(rutaId) {
+        if (!rutaId || rutaId.trim() === '') {
+            alert('⚠️ ID de ruta inválido');
+            return;
+        }
+        console.log('👁️ Ver detalles de ruta:', rutaId);
+        alert(`📊 Detalles de ruta: ${rutaId}\n\nFuncionality coming in v2.1`);
+    }
+
+    // Ocultar loop de niveles Bloom (ahora se hace en la lógica progresiva)
+    if (false) {
+        nivelesIncluidos.forEach((nivel, idx) => {
+            const examenesNivel = examenes[nivel] || [];
+            const flashcardsNivel = flashcards[nivel] || [];
+            const estadoNivel = rutaData.metadatos.estado_niveles?.[nivel] || 'DESCONOCIDO';
+            
+            // Determinar color según nivel
+            const coloresNivel = {
+                'Recordar': '#667eea',
+                'Comprender': '#764ba2',
+                'Aplicar': '#f093fb',
+                'Analizar': '#4facfe',
+                'Evaluar': '#43e97b',
+                'Crear': '#fa709a'
+            };
+            const color = coloresNivel[nivel] || '#667eea';
+            
+            html += `
+                <div class="card mb-3 border-0 shadow-sm">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                ${idx + 1}. 🎓 Nivel: ${escape_html(nivel)}
+                            </h5>
+                            <span class="badge bg-light text-dark">${escape_html(estadoNivel)}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="mb-3">📝 Exámenes (${examenesNivel.length})</h6>
+                                ${examenesNivel.length > 0 ? `
+                                    <ul class="list-group list-group-flush">
+                                        ${examenesNivel.slice(0, 3).map((examen, i) => `
+                                            <li class="list-group-item px-0">
+                                                <small class="text-muted">#${i + 1}</small>
+                                                <div class="mt-1">
+                                                    ${escape_html(examen.pregunta || examen.titulo || JSON.stringify(examen).substring(0, 80))}
+                                                </div>
+                                            </li>
+                                        `).join('')}
+                                        ${examenesNivel.length > 3 ? `
+                                            <li class="list-group-item px-0 text-muted">
+                                                <small>... y ${examenesNivel.length - 3} más</small>
+                                            </li>
+                                        ` : ''}
+                                    </ul>
+                                ` : '<p class="text-muted"><small>Sin exámenes</small></p>'}
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="mb-3">🃏 Flashcards (${flashcardsNivel.length})</h6>
+                                ${flashcardsNivel.length > 0 ? `
+                                    <ul class="list-group list-group-flush">
+                                        ${flashcardsNivel.slice(0, 3).map((flashcard, i) => `
+                                            <li class="list-group-item px-0">
+                                                <small class="text-muted">#${i + 1}</small>
+                                                <div class="mt-1">
+                                                    ${escape_html(flashcard.pregunta || flashcard.frente || JSON.stringify(flashcard).substring(0, 80))}
+                                                </div>
+                                            </li>
+                                        `).join('')}
+                                        ${flashcardsNivel.length > 3 ? `
+                                            <li class="list-group-item px-0 text-muted">
+                                                <small>... y ${flashcardsNivel.length - 3} más</small>
+                                            </li>
+                                        ` : ''}
+                                    </ul>
+                                ` : '<p class="text-muted"><small>Sin flashcards</small></p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        cont.innerHTML = html;
+    }
+
+    function verDetallesRuta(rutaId) {
+        // Implementar modal de detalles de ruta
+        if (!rutaId || rutaId.trim() === '') {
+            alert('⚠️ ID de ruta inválido');
+            return;
+        }
+
+        // TODO: Crear modal separado para mostrar detalles:
+        // - Nombre completo
+        // - Descripción extendida
+        // - Archivos incluidos (lista)
+        // - Niveles Bloom disponibles
+        // - Progreso actual
+        // - Botón para continuar
+
+        console.log('👁️ Ver detalles de ruta:', rutaId);
+        alert(`📊 Detalles de ruta: ${rutaId}\n\nFuncionality coming in v2.1`);
+    }
+
+    // ===== RUTA DE APRENDIZAJE (LEGACY) =====
+    let estadoRuta = null;
+    let examenActual = null;
+    let isLoading = false;
+
+    async function cargarEstadoRuta() {
+        if (isLoading) return;
+        isLoading = true;
+        const btnRuta = document.getElementById('btnCargarRuta');
+        if (btnRuta) btnRuta.disabled = true;
+        
+        const cont = document.getElementById('rutaAprendizaje');
+        cont.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
+        
+        try {
+            const res = await fetch('/ruta/estado');
+            if (!res.ok) {
+                throw new Error('No se pudo cargar el estado de la ruta');
+            }
+            estadoRuta = await res.json();
+            
+            // Si el examen está pendiente, mostrar examen directamente
+            if (estadoRuta.examen_pendiente && estadoRuta.examen_generado) {
+                await cargarExamenInicial();
+            } else if (estadoRuta.examen_generado) {
+                renderRuta();
+            } else {
+                cont.innerHTML = '<div class="alert alert-warning">Sube material para generar examen y ruta.</div>';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            cont.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        } finally {
+            isLoading = false;
+            if (btnRuta) btnRuta.disabled = false;
+        }
+    }
+
+    async function cargarExamenInicial() {
+        const cont = document.getElementById('rutaAprendizaje');
+        cont.innerHTML = '<div id="examenInicial" style="min-height: 400px;"></div>';
+        
+        try {
+            const res = await fetch('/examen-inicial');
+            if (!res.ok) {
+                document.getElementById('examenInicial').innerHTML = `
+                    <div class="alert alert-warning mb-0">No hay examen inicial disponible todavía.</div>`;
+                return;
+            }
+            examenActual = await res.json();
+            renderExamen(examenActual.contenido);
+        } catch (error) {
+            console.error('Error cargando examen:', error);
+            document.getElementById('examenInicial').innerHTML = `
+                <div class="alert alert-danger">Error cargando el examen: ${error.message}</div>`;
+        }
+    }
+
+    function renderExamen(contenido) {
+        const preguntas = (contenido?.EXAMENES?.EXAMEN_INICIAL) || [];
+        const cont = document.getElementById('examenInicial');
+        if (!preguntas.length) {
+            cont.innerHTML = '<div class="alert alert-info mb-0">Aún no hay preguntas generadas.</div>';
+            return;
+        }
+        
+        const totalPreguntas = preguntas.length;
+        let html = `
+            <div class="alert alert-info mb-3">
+                <strong>📝 Examen Diagnóstico - Zona de Desarrollo Próximo (ZDP)</strong><br>
+                <small>${totalPreguntas} preguntas de dificultad incremental</small>
+            </div>
+            <form id="formExamenInicial">`;
+        preguntas.forEach((p, idx) => {
+            const levelColor = ['primary', 'info', 'success', 'warning', 'danger'][idx % 5];
+            html += `
+            <div class="mb-4 p-3 border rounded bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong class="fw-bold">Pregunta ${idx + 1} de ${totalPreguntas}</strong>
+                    <span class="badge bg-${levelColor}">${p.nivel_bloom_evaluado || 'Bloom'}</span>
+                </div>
+                <div class="mb-3">${p.pregunta}</div>`;
+            if (p.opciones) {
+                p.opciones.forEach((op, opIdx) => {
+                    const letra = String.fromCharCode(97 + opIdx);
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="preg_${p.id}" value="${letra}" id="preg_${p.id}_${opIdx}" required>
+                            <label class="form-check-label" for="preg_${p.id}_${opIdx}">${letra}) ${op}</label>
+                        </div>`;
+                });
+            }
+            html += '</div>';
+        });
+        html += `
+            <button type="submit" class="btn btn-lg btn-primary w-100">✓ Enviar Examen</button>
+        </form>`;
+        cont.innerHTML = html;
+
+        document.getElementById('formExamenInicial').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Validar que todas las preguntas estén respondidas
+            const sinResponder = preguntas.filter(p => !document.querySelector(`input[name="preg_${p.id}"]:checked`));
+            if (sinResponder.length > 0) {
+                alert(`⚠️ Por favor responde todas las preguntas. Faltan ${sinResponder.length}.`);
+                return;
+            }
+            
+            const btnSubmit = e.target.querySelector('button[type="submit"]');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+            
+            try {
+                const respuestas = preguntas.map((p) => {
+                    const val = (document.querySelector(`input[name="preg_${p.id}"]:checked`) || {}).value || '';
+                    return { pregunta_id: p.id, respuesta: val, tiempo_seg: 0 };
+                });
+                const resp = await fetch('/examen-inicial/responder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ respuestas })
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    alert('❌ ' + (err.error || 'Error al enviar el examen'));
+                    return;
+                }
+                // Volver a cargar la ruta (ahora mostrará la ruta personalizada)
+                await cargarEstadoRuta();
+                alert('✅ Examen completado exitosamente. Tu perfil ZDP ha sido actualizado.');
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '✓ Enviar Examen';
+            }
+        });
+    }
+
+    function renderRuta() {
+        const cont = document.getElementById('rutaAprendizaje');
+        if (!estadoRuta) {
+            cont.innerHTML = '<div class="alert alert-secondary">Cargando estado...</div>';
+            return;
+        }
+
+        const { examen_pendiente, examen_generado, perfil_zdp, ruta } = estadoRuta;
+
+        if (!examen_generado) {
+            cont.innerHTML = '<div class="alert alert-warning">Sube material para generar examen y ruta.</div>';
+            return;
+        }
+
+        if (examen_pendiente) {
+            cont.innerHTML = `
+                <div class="alert alert-info mb-3">Debes completar el examen inicial para personalizar tu ruta.</div>
+                <div id="examenInicial"></div>
+            `;
+            cargarExamenInicial();
+            return;
+        }
+
+        const competencias = (perfil_zdp && perfil_zdp.competencias) || {};
+        const flashcards = ruta?.estructura?.flashcards || {};
+        const examenes = ruta?.estructura?.examenes || {};
+        const niveles = ruta?.metadatos?.niveles_incluidos || Object.keys(flashcards);
+
+        let html = '';
+        if (perfil_zdp) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="mb-1">Perfil ZDP</h6>
+                    <div class="small text-muted">Nivel actual: ${perfil_zdp.nivel_actual || 'N/D'} | Zona próxima: ${(perfil_zdp.zona_proxima || []).join(', ') || 'N/D'}</div>
+                </div>`;
+        }
+
+        niveles.forEach((nivel) => {
+            const comp = competencias[nivel];
+            if (comp && comp.competente) {
+                return; // omitir niveles ya dominados
+            }
+
+            const fcs = flashcards[nivel] || [];
+            const exs = examenes[nivel] || [];
+            if (!fcs.length && !exs.length) return;
+
+            html += `<div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>📚 Nivel: ${nivel}</span>
+                    ${comp ? `<span class="badge bg-${comp.competente ? 'success' : 'secondary'}">${comp.competente ? 'Dominado' : 'Pendiente'}</span>` : ''}
+                </div>
+                <div class="card-body">
+                    ${fcs.length ? '<h6>Flashcards</h6>' : ''}
+                    ${fcs.length ? '<ul class="mb-3">' + fcs.map(fc => `<li><strong>${fc.frente || ''}</strong>: ${fc.reverso || ''}</li>`).join('') + '</ul>' : ''}
+                    ${exs.length ? '<h6>Exámenes</h6>' : ''}
+                    ${exs.length ? '<ul>' + exs.map(ex => `<li>${ex.pregunta || ''}</li>`).join('') + '</ul>' : ''}
+                </div>
+            </div>`;
+        });
+
+        if (!html) {
+            html = '<div class="alert alert-success">Has completado los niveles generados.</div>';
+        }
+
+        cont.innerHTML = html;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnRuta = document.getElementById('btnCargarRuta');
+        if (btnRuta) {
+            btnRuta.addEventListener('click', () => cargarEstadoRuta());
+        }
+    });
+
+    // ===== ARCHIVOS (LEGACY) =====
     function cargarArchivosModal() {
         // Mostrar modal
         const modal = new bootstrap.Modal(document.getElementById('modalArchivos'));

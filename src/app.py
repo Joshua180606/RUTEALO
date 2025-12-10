@@ -1,8 +1,10 @@
 import os
+import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest
+from bson.objectid import ObjectId
 
 # Nota: Para ejecutar la aplicación localmente usa la forma de módulo
 # recomendada (por ejemplo `python -m src.app`) o `flask run`.
@@ -11,7 +13,16 @@ from werkzeug.exceptions import BadRequest
 from src.config import COLS, RAW_DIR, SECRET_KEY, DEBUG
 from src.logging_config import setup_logging, get_logger
 from src.database import get_database_connection
-from src.web_utils import get_db, procesar_archivo_web, auto_etiquetar_bloom
+from src.web_utils import (
+    get_db,
+    procesar_archivo_web,
+    auto_etiquetar_bloom,
+    generar_ruta_aprendizaje,
+    procesar_respuesta_examen_web,
+    obtener_perfil_estudiante_zdp,
+    procesar_multiples_archivos_web,
+    obtener_rutas_usuario,
+)
 from src.utils import validate_username, validate_password_strength, crear_carpeta_usuario, listar_archivos_usuario, obtener_ruta_archivo
 
 # Configurar logging
@@ -352,6 +363,15 @@ def upload_file():
                     processed_count = auto_etiquetar_bloom(usuario, db)
                     flash(f"Análisis IA completado: {processed_count} documentos etiquetados.", "success")
                     logger.info(f"Bloom tagging completed for {usuario}: {processed_count} items")
+
+                    # Generar ruta de aprendizaje y examen inicial con el nuevo material
+                    try:
+                        msg_ruta = generar_ruta_aprendizaje(usuario, db)
+                        flash(msg_ruta, "info")
+                        logger.info(f"Ruta/aprendizaje generada para {usuario}: {msg_ruta}")
+                    except Exception as ex:
+                        flash(f"No se pudo generar la ruta/aprendizaje: {ex}", "warning")
+                        logger.error(f"Error generando ruta para {usuario}: {ex}")
                 except Exception as e:
                     flash(f"Error en análisis IA: {e}", "danger")
                     logger.error(f"Bloom tagging error for {usuario}: {str(e)}")
@@ -410,6 +430,539 @@ def download_file(archivo):
         flash(f"Error descargando archivo: {str(e)}", "danger")
         logger.error(f"Download error for {usuario}: {str(e)}")
         return redirect(url_for("dashboard"))
+
+
+@app.route("/ruta/estado")
+def estado_ruta():
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+
+    # Perfil ZDP
+    perfil = obtener_perfil_estudiante_zdp(usuario)
+
+    # Examen inicial
+    exam_doc = db[COLS["EXAM_INI"]].find_one({"usuario": usuario})
+    examen_pendiente = not exam_doc or exam_doc.get("estado") != "COMPLETADO"
+
+    # Ruta
+    ruta_doc = db[COLS["RUTAS"]].find_one({"usuario": usuario}) or {}
+
+    return {
+        "usuario": usuario,
+        "examen_pendiente": examen_pendiente,
+        "examen_generado": bool(exam_doc),
+        "perfil_zdp": perfil,
+        "ruta": {
+            "estructura": ruta_doc.get("estructura_ruta"),
+            "metadatos": ruta_doc.get("metadatos_ruta"),
+        },
+    }, 200
+
+
+@app.route("/ruta/<ruta_id>/contenido")
+def obtener_contenido_ruta(ruta_id):
+    """Obtener contenido de una ruta específica por ID"""
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+
+    try:
+        from bson import ObjectId
+        ruta_obj_id = ObjectId(ruta_id)
+    except Exception:
+        return {"error": "ID de ruta inválido"}, 400
+
+    # Buscar ruta y verificar ownership
+    ruta_doc = db[COLS["RUTAS"]].find_one({"_id": ruta_obj_id, "usuario": usuario})
+    if not ruta_doc:
+        return {"error": "Ruta no encontrada"}, 404
+
+    # Adjuntar información del test inicial (para decidir qué omitir o no)
+    exam_doc = db[COLS["EXAM_INI"]].find_one({"usuario": usuario})
+    test_info = None
+    if exam_doc:
+        examenes = exam_doc.get("contenido", {}).get("EXAMENES", {})
+        exam_inicial = examenes.get("EXAMEN_INICIAL") if isinstance(examenes, dict) else None
+        test_info = {
+            "estado": exam_doc.get("estado", "PENDIENTE"),
+            "origen": exam_doc.get("origen", "desconocido"),
+            "fecha_generacion": exam_doc.get("fecha_generacion"),
+            "preguntas": len(exam_inicial) if isinstance(exam_inicial, list) else 0,
+        }
+
+    return {
+        "ruta_id": str(ruta_doc["_id"]),
+        "nombre": ruta_doc.get("nombre_ruta", "Sin nombre"),
+        "descripcion": ruta_doc.get("descripcion", ""),
+        "estado": ruta_doc.get("estado", "ACTIVA"),
+        "estructura": ruta_doc.get("estructura_ruta"),
+        "metadatos": ruta_doc.get("metadatos_ruta"),
+        "archivos_fuente": ruta_doc.get("archivos_fuente", []),
+        "fecha_creacion": ruta_doc.get("fecha_creacion"),
+        "fecha_actualizacion": ruta_doc.get("fecha_actualizacion"),
+        "test_inicial": test_info,
+    }, 200
+
+
+@app.route("/examen-inicial")
+def obtener_examen_inicial():
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+    exam_doc = db[COLS["EXAM_INI"]].find_one({"usuario": usuario})
+    if not exam_doc:
+        return {"error": "No hay examen generado"}, 404
+
+    return {
+        "usuario": usuario,
+        "estado": exam_doc.get("estado", "PENDIENTE"),
+        "contenido": exam_doc.get("contenido", {}),
+        "fecha_generacion": exam_doc.get("fecha_generacion"),
+    }, 200
+
+
+@app.route("/examen-inicial/responder", methods=["POST"])
+def responder_examen_inicial():
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+    data = request.get_json(silent=True) or {}
+    respuestas = data.get("respuestas")
+
+    if not respuestas or not isinstance(respuestas, list):
+        return {"error": "Faltan respuestas"}, 400
+
+    exam_doc = db[COLS["EXAM_INI"]].find_one({"usuario": usuario})
+    if not exam_doc:
+        return {"error": "No hay examen inicial generado"}, 404
+
+    resultado = procesar_respuesta_examen_web(usuario, respuestas, exam_doc.get("contenido", {}))
+
+    # Normalizar posibles errores
+    if resultado.get("status", 200) != 200 or resultado.get("error"):
+        status = resultado.get("status", 500)
+        return {"error": resultado.get("error", "Error evaluando examen")}, status
+
+    # Marcar examen como completado
+    try:
+        import datetime
+
+        db[COLS["EXAM_INI"]].update_one(
+            {"usuario": usuario},
+            {"$set": {"estado": "COMPLETADO", "fecha_completado": datetime.datetime.utcnow()}},
+        )
+    except Exception as e:
+        logger.error(f"No se pudo marcar examen como completado para {usuario}: {e}")
+
+    return {"resultado": resultado}, 200
+
+
+# --- NUEVOS ENDPOINTS PARA REDISEÑO DASHBOARD ---
+
+
+@app.route("/rutas/lista", methods=["GET"])
+def listar_rutas():
+    """
+    Retorna lista de rutas del usuario autenticado.
+    
+    Response:
+        200: { "rutas": [...], "total": number }
+        401: { "error": "Unauthorized" }
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    usuario = session["usuario"]
+    
+    try:
+        rutas = obtener_rutas_usuario(usuario, db)
+        
+        return {
+            "rutas": rutas,
+            "total": len(rutas)
+        }, 200
+    
+    except Exception as e:
+        logger.error(f"Error listando rutas para {usuario}: {e}")
+        return {"error": "Error cargando rutas"}, 500
+
+
+@app.route("/crear-ruta", methods=["POST"])
+def crear_ruta():
+    """
+    Crea una nueva ruta de aprendizaje con múltiples archivos.
+    
+    Form Data:
+        nombre_ruta: str (required, max 100)
+        descripcion: str (optional, max 500)
+        archivos: FileStorage[] (required, 1+)
+    
+    Response:
+        201: { "ruta_id": "...", "nombre_ruta": "...", "estado": "...", "mensaje": "..." }
+        400: { "error": "..." }
+        409: { "error": "Nombre ya existe" }
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    usuario = session["usuario"]
+    nombre_ruta = request.form.get("nombre_ruta", "").strip()
+    descripcion = request.form.get("descripcion", "").strip()
+    
+    # VALIDACIONES
+    # 1. Validar nombre
+    if not nombre_ruta:
+        return {"error": "Nombre de ruta requerido"}, 400
+    
+    if len(nombre_ruta) > 100:
+        return {"error": "Nombre muy largo (máx 100 caracteres)"}, 400
+    
+    # 2. Validar descripción
+    if len(descripcion) > 500:
+        return {"error": "Descripción muy larga (máx 500 caracteres)"}, 400
+    
+    # 3. Validar archivos
+    if "archivos" not in request.files:
+        return {"error": "No se seleccionaron archivos"}, 400
+    
+    archivos = request.files.getlist("archivos")
+    if not archivos or all(f.filename == "" for f in archivos):
+        return {"error": "Al menos un archivo requerido"}, 400
+    
+    # 4. Validar nombre único por usuario
+    col_rutas = db[COLS["RUTAS"]]
+    if col_rutas.find_one({"usuario": usuario, "nombre_ruta": nombre_ruta}):
+        return {"error": "Ya existe una ruta con ese nombre"}, 409
+    
+    # PROCESAR ARCHIVOS
+    archivos_procesados = []
+    archivos_rutas = []
+    ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    
+    try:
+        # Crear carpeta usuario si no existe
+        crear_carpeta_usuario(usuario, str(app.config["UPLOAD_FOLDER"]))
+        usuario_folder = os.path.join(str(app.config["UPLOAD_FOLDER"]), usuario)
+        
+        # Procesar cada archivo
+        for archivo in archivos:
+            # Validar nombre
+            if archivo.filename == "":
+                continue
+            
+            # Validar extensión
+            filename = secure_filename(archivo.filename)
+            ext = os.path.splitext(filename)[1].lower()
+            
+            if ext not in ALLOWED_EXTENSIONS:
+                return {
+                    "error": f"Tipo de archivo no permitido: {ext}"
+                }, 400
+            
+            # Validar tamaño
+            archivo.seek(0, os.SEEK_END)
+            file_size = archivo.tell()
+            archivo.seek(0)
+            
+            if file_size > MAX_FILE_SIZE:
+                return {
+                    "error": f"Archivo {filename} demasiado grande (máx 50MB)"
+                }, 400
+            
+            # Guardar archivo
+            filepath = os.path.join(usuario_folder, filename)
+            archivo.save(filepath)
+            
+            # Registrar para procesamiento
+            archivos_rutas.append(filepath)
+            archivos_procesados.append({
+                "nombre_archivo": filename,
+                "tamaño": file_size / 1024 / 1024,  # MB
+                "fecha_subida": datetime.datetime.utcnow(),
+                "tipo": ext.replace(".", "")
+            })
+        
+        if not archivos_rutas:
+            return {"error": "No se pudieron procesar los archivos"}, 400
+        
+        # Crear carpeta específica para esta ruta
+        nombre_ruta_safe = secure_filename(nombre_ruta.replace(" ", "_"))
+        ruta_folder = os.path.join(str(app.config["UPLOAD_FOLDER"]), usuario, nombre_ruta_safe)
+        os.makedirs(ruta_folder, exist_ok=True)
+        
+        # Mover archivos a la carpeta de la ruta
+        archivos_rutas_final = []
+        for i, archivo_path in enumerate(archivos_rutas):
+            nuevo_path = os.path.join(ruta_folder, os.path.basename(archivo_path))
+            os.rename(archivo_path, nuevo_path)
+            archivos_rutas_final.append(nuevo_path)
+            archivos_procesados[i]["ruta_relativa"] = f"{usuario}/{nombre_ruta_safe}/{os.path.basename(archivo_path)}"
+        
+        # PROCESAR CONTENIDO (multiple files)
+        ok, resultados, msg_ingesta = procesar_multiples_archivos_web(
+            archivos_rutas_final, usuario, db
+        )
+        
+        if not ok:
+            return {
+                "error": f"Error procesando archivos: {msg_ingesta}"
+            }, 400
+        
+        # ETIQUETADO BLOOM
+        try:
+            processed_count = auto_etiquetar_bloom(usuario, db)
+            logger.info(f"Bloom tagging: {processed_count} documentos para {usuario}")
+        except Exception as e:
+            logger.warning(f"Bloom tagging error para {usuario}: {e}")
+        
+        # GENERAR RUTA Y EXAMEN
+        try:
+            msg_ruta = generar_ruta_aprendizaje(usuario, db)
+            logger.info(f"Ruta generada para {usuario}: {msg_ruta}")
+        except Exception as e:
+            return {
+                "error": f"Error generando ruta: {str(e)}"
+            }, 500
+        
+        # CREAR/ACTUALIZAR DOCUMENTO DE RUTA CON METADATA
+        ruta_existente = col_rutas.find_one({"usuario": usuario})
+        
+        ruta_doc = {
+            "usuario": usuario,
+            "nombre_ruta": nombre_ruta,
+            "descripcion": descripcion,
+            "estado": "ACTIVA",
+            "archivos_fuente": archivos_procesados,
+            "fecha_creacion": datetime.datetime.utcnow(),
+            "fecha_actualizacion": datetime.datetime.utcnow(),
+        }
+        
+        # Agregar estructura y metadatos existentes si hay
+        if ruta_existente:
+            ruta_doc["estructura_ruta"] = ruta_existente.get("estructura_ruta", {})
+            ruta_doc["metadatos_ruta"] = ruta_existente.get("metadatos_ruta", {})
+            ruta_doc["progreso_global"] = ruta_existente.get("progreso_global", 0)
+        
+        resultado = col_rutas.replace_one(
+            {"usuario": usuario},
+            ruta_doc,
+            upsert=True
+        )
+        
+        # Obtener ruta_id
+        if resultado.upserted_id:
+            ruta_id = str(resultado.upserted_id)
+        else:
+            ruta_id = str(ruta_existente["_id"])
+        
+        # Verificar si hay test inicial pendiente
+        exam_doc = db[COLS["EXAM_INI"]].find_one({"usuario": usuario})
+        estado_examen = "TEST_PENDIENTE" if not exam_doc or exam_doc.get("estado") != "COMPLETADO" else "ACTIVA"
+        
+        return {
+            "ruta_id": ruta_id,
+            "nombre_ruta": nombre_ruta,
+            "estado": estado_examen,
+            "mensaje": msg_ruta,
+            "archivos_procesados": len(archivos_procesados)
+        }, 201
+    
+    except Exception as e:
+        logger.error(f"Error creando ruta para {usuario}: {e}")
+        return {
+            "error": f"Error al crear ruta: {str(e)}"
+        }, 500
+
+
+@app.route("/ruta/<ruta_id>/actualizar", methods=["PUT"])
+def actualizar_ruta(ruta_id):
+    """
+    Actualiza nombre y/o descripción de una ruta.
+    
+    JSON Body:
+        { "nombre_ruta": "str (optional)", "descripcion": "str (optional)", "estado": "enum (optional)" }
+    
+    Response:
+        200: { "mensaje": "Actualizado exitosamente" }
+        400: { "error": "..." }
+        404: { "error": "Ruta no encontrada" }
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    usuario = session["usuario"]
+    
+    try:
+        ruta_id_obj = ObjectId(ruta_id)
+    except:
+        return {"error": "ID de ruta inválido"}, 400
+    
+    # Obtener datos a actualizar
+    data = request.get_json(silent=True) or {}
+    updates = {}
+    
+    # Validar y agregar campos
+    if "nombre_ruta" in data:
+        nombre = data["nombre_ruta"].strip()
+        if not nombre:
+            return {"error": "Nombre no puede estar vacío"}, 400
+        if len(nombre) > 100:
+            return {"error": "Nombre muy largo"}, 400
+        updates["nombre_ruta"] = nombre
+    
+    if "descripcion" in data:
+        desc = data["descripcion"].strip()
+        if len(desc) > 500:
+            return {"error": "Descripción muy larga"}, 400
+        updates["descripcion"] = desc
+    
+    if "estado" in data:
+        estado = data["estado"]
+        if estado not in ["ACTIVA", "PAUSADA", "COMPLETADA"]:
+            return {"error": "Estado inválido"}, 400
+        updates["estado"] = estado
+    
+    if not updates:
+        return {"error": "No hay campos para actualizar"}, 400
+    
+    # Validar que sea propietario
+    col_rutas = db[COLS["RUTAS"]]
+    ruta = col_rutas.find_one({
+        "_id": ruta_id_obj,
+        "usuario": usuario
+    })
+    
+    if not ruta:
+        return {"error": "Ruta no encontrada"}, 404
+    
+    # Actualizar
+    try:
+        updates["fecha_actualizacion"] = datetime.datetime.utcnow()
+        
+        result = col_rutas.update_one(
+            {"_id": ruta_id_obj, "usuario": usuario},
+            {"$set": updates}
+        )
+        
+        if result.matched_count == 0:
+            return {"error": "Ruta no encontrada"}, 404
+        
+        return {
+            "mensaje": "Ruta actualizada exitosamente",
+            "campos_actualizados": list(updates.keys())
+        }, 200
+    
+    except Exception as e:
+        logger.error(f"Error actualizando ruta {ruta_id}: {e}")
+        return {"error": "Error al actualizar"}, 500
+
+
+@app.route("/ruta/<ruta_id>", methods=["DELETE"])
+def eliminar_ruta(ruta_id):
+    """
+    Elimina una ruta de aprendizaje.
+    
+    Response:
+        200: { "mensaje": "Ruta eliminada" }
+        404: { "error": "Ruta no encontrada" }
+    """
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    usuario = session["usuario"]
+    
+    try:
+        ruta_id_obj = ObjectId(ruta_id)
+    except:
+        return {"error": "ID de ruta inválido"}, 400
+    
+    try:
+        col_rutas = db[COLS["RUTAS"]]
+        
+        result = col_rutas.delete_one({
+            "_id": ruta_id_obj,
+            "usuario": usuario
+        })
+        
+        if result.deleted_count == 0:
+            return {"error": "Ruta no encontrada"}, 404
+        
+        return {
+            "mensaje": "Ruta eliminada exitosamente"
+        }, 200
+    
+    except Exception as e:
+        logger.error(f"Error eliminando ruta {ruta_id}: {e}")
+        return {"error": "Error al eliminar"}, 500
+
+
+@app.route("/ruta/<ruta_id>/regenerar-test", methods=["POST"])
+def regenerar_test_ruta(ruta_id):
+    """Regenera el test diagnóstico de una ruta con las nuevas preguntas basadas en contenido"""
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+
+    try:
+        from bson import ObjectId
+        ruta_obj_id = ObjectId(ruta_id)
+    except Exception:
+        return {"error": "ID de ruta inválido"}, 400
+
+    # Verificar que la ruta existe y pertenece al usuario
+    ruta_doc = db[COLS["RUTAS"]].find_one({"_id": ruta_obj_id, "usuario": usuario})
+    if not ruta_doc:
+        return {"error": "Ruta no encontrada"}, 404
+
+    try:
+        # Forzar regeneración del test y ruta
+        msg_ruta = generar_ruta_aprendizaje(usuario, db)
+        logger.info(f"Test regenerado para usuario {usuario}: {msg_ruta}")
+        
+        return {
+            "mensaje": "Test diagnóstico regenerado exitosamente",
+            "detalle": msg_ruta
+        }, 200
+    
+    except Exception as e:
+        logger.error(f"Error regenerando test para {ruta_id}: {e}")
+        return {"error": f"Error al regenerar test: {str(e)}"}, 500
+
+
+@app.route("/ruta/<ruta_id>/fuentes")
+def obtener_fuentes_ruta(ruta_id):
+    """Obtener archivos fuente de una ruta específica"""
+    if "usuario" not in session:
+        return {"error": "Unauthorized"}, 401
+
+    usuario = session["usuario"]
+
+    try:
+        from bson import ObjectId
+        ruta_obj_id = ObjectId(ruta_id)
+    except Exception:
+        return {"error": "ID de ruta inválido"}, 400
+
+    # Buscar ruta y verificar ownership
+    ruta_doc = db[COLS["RUTAS"]].find_one({"_id": ruta_obj_id, "usuario": usuario})
+    if not ruta_doc:
+        return {"error": "Ruta no encontrada"}, 404
+
+    archivos_fuente = ruta_doc.get("archivos_fuente", [])
+
+    return {
+        "ruta_id": str(ruta_doc["_id"]),
+        "nombre_ruta": ruta_doc.get("nombre_ruta", "Sin nombre"),
+        "archivos": archivos_fuente,
+        "total": len(archivos_fuente),
+    }, 200
 
 
 @app.teardown_appcontext

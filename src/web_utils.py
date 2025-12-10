@@ -205,13 +205,18 @@ def generar_examen_inicial(contenido_total):
         return {}
 
     prompt = f"""
-    Actúa como un psicopedagogo experto. Basado en el siguiente contenido educativo, genera un EXAMEN DE DIAGNÓSTICO INICIAL.
+    Actúa como un psicopedagogo experto. Basado en el siguiente contenido educativo, genera un EXAMEN DE DIAGNÓSTICO (Test de Conocimientos Previos).
     
-    OBJETIVO: Identificar la Zona de Desarrollo Próximo del estudiante.
-    ESTRATEGIA: Genera 5 preguntas de dificultad incremental (desde 'Recordar' hasta 'Analizar').
+    OBJETIVO: Identificar la Zona de Desarrollo Próximo del estudiante evaluando sus conocimientos SOBRE EL CONTENIDO ESPECÍFICO del material.
     
-    CONTENIDO BASE (Resumido):
-    {contenido_total[:15000]}
+    ESTRATEGIA:
+    - Genera 8-10 preguntas de dificultad incremental basadas EN CONCEPTOS, TÉRMINOS Y TEMAS que aparecen en el contenido.
+    - Niveles Bloom: Empieza en "Recordar" (definiciones, hechos), sube a "Comprender" (explicaciones), luego "Aplicar" (casos), hasta "Analizar" (relaciones).
+    - TODAS las preguntas deben tener 5 opciones: 4 respuestas (a, b, c, d) + 1 opción especial "e) No lo sé / Omitir"
+    - La respuesta correcta NUNCA debe ser la opción "e"
+    
+    CONTENIDO BASE (Material del estudiante):
+    {contenido_total[:18000]}
     
     FORMATO JSON OBLIGATORIO:
     {{
@@ -219,19 +224,52 @@ def generar_examen_inicial(contenido_total):
             "EXAMEN_INICIAL": [
                 {{
                     "id": 1,
-                    "pregunta": "¿...?",
-                    "opciones": ["a", "b", "c", "d"],
+                    "pregunta": "¿Qué significa [TÉRMINO DEL CONTENIDO]?",
+                    "opciones": [
+                        "a) [Definición correcta del contenido]",
+                        "b) [Definición incorrecta plausible]",
+                        "c) [Otra definición incorrecta]",
+                        "d) [Distractor]",
+                        "e) No lo sé / Omitir"
+                    ],
                     "respuesta_correcta": "a",
                     "nivel_bloom_evaluado": "Recordar"
+                }},
+                {{
+                    "id": 2,
+                    "pregunta": "Según el material, ¿cuál es la relación entre [CONCEPTO A] y [CONCEPTO B]?",
+                    "opciones": [
+                        "a) [Relación correcta]",
+                        "b) [Relación incorrecta]",
+                        "c) [Otra incorrecta]",
+                        "d) [Distractor]",
+                        "e) No lo sé / Omitir"
+                    ],
+                    "respuesta_correcta": "a",
+                    "nivel_bloom_evaluado": "Comprender"
                 }}
             ]
         }}
     }}
+    
+    IMPORTANTE:
+    - Las preguntas deben ser ESPECÍFICAS del contenido subido, no genéricas
+    - La opción "e) No lo sé / Omitir" es OBLIGATORIA en todas las preguntas
+    - Genera entre 8-10 preguntas para cubrir bien el material
     """
     try:
         res = model.generate_content(prompt)
         text_clean = re.sub(r"```json|```", "", res.text).strip()
-        return json.loads(text_clean)
+        data = json.loads(text_clean)
+        
+        # Validar que todas las preguntas tengan 5 opciones con la opción de omitir
+        if "EXAMENES" in data and "EXAMEN_INICIAL" in data["EXAMENES"]:
+            for pregunta in data["EXAMENES"]["EXAMEN_INICIAL"]:
+                if len(pregunta.get("opciones", [])) < 5:
+                    # Agregar opción omitir si falta
+                    pregunta["opciones"].append("e) No lo sé / Omitir")
+        
+        return data
     except Exception as e:
         logger.error(f"⚠️ Error generando examen inicial: {e}")
         return {}
@@ -294,9 +332,34 @@ def generar_ruta_aprendizaje(usuario, db):
 
     # 1. Obtener Contexto Global
     contenido_bloom, contenido_total_raw = obtener_contexto_usuario(db, usuario)
+    col_examen = db[COL_EXAM_INI]
+    col_ruta = db[COL_RUTAS]
 
     if not contenido_total_raw:
-        return "No se encontró contenido procesado (Bloom) suficiente para generar una ruta."
+        # Si no hay nuevo contenido Bloom, intentar reutilizar lo existente o crear un mínimo base
+        examen_existente = col_examen.find_one({"usuario": usuario})
+        ruta_existente = col_ruta.find_one({"usuario": usuario})
+
+        if examen_existente or ruta_existente:
+            logger.info("No hay nuevo contenido Bloom; se mantiene la ruta/examen previos.")
+            return "No hay nuevo contenido Bloom; se mantuvo la ruta y examen existentes."
+
+        logger.warning("No hay contenido Bloom; generando materiales base mínimos para no bloquear la ruta.")
+
+        examen_minimo = _crear_examen_minimo()
+        doc_examen_fallback = {
+            "usuario": usuario,
+            "contenido": examen_minimo,
+            "estado": "PENDIENTE",
+            "origen": "fallback_sin_bloom",
+            "fecha_generacion": datetime.datetime.utcnow(),
+        }
+        col_examen.replace_one({"usuario": usuario}, doc_examen_fallback, upsert=True)
+
+        ruta_fallback = _crear_ruta_minima(usuario)
+        col_ruta.replace_one({"usuario": usuario}, ruta_fallback, upsert=True)
+
+        return "Ruta generada con materiales base mínimos (sin Bloom). Carga más contenido para personalizarla."
 
     # 2. Generar/Actualizar Examen Inicial (ZDP)
     # Siempre regeneramos para incluir el nuevo material en el diagnóstico
@@ -349,9 +412,136 @@ def generar_ruta_aprendizaje(usuario, db):
         "fecha_actualizacion": datetime.datetime.utcnow(),
     }
 
-    db[COL_RUTAS].replace_one({"usuario": usuario}, doc_ruta, upsert=True)
+    # Si no se generaron bloques (p. ej. contenidos vacíos), usar un fallback mínimo
+    if not ruta_completa:
+        logger.warning("No se generaron bloques de ruta; creando ruta mínima para evitar bloqueo.")
+        ruta_fallback = _crear_ruta_minima(usuario)
+        col_ruta.replace_one({"usuario": usuario}, ruta_fallback, upsert=True)
+        return "Ruta generada con materiales base mínimos. Agrega más contenido para enriquecerla."
+
+    col_ruta.replace_one({"usuario": usuario}, doc_ruta, upsert=True)
 
     return f"Ruta regenerada con {len(ruta_completa)} niveles y Examen Diagnóstico actualizado."
+
+
+def _crear_examen_minimo():
+    """Crea un examen diagnóstico base cuando no hay contenido Bloom disponible."""
+    preguntas_base = [
+        {
+            "id": 1,
+            "pregunta": "¿Cuál es el concepto central que identificas en el material subido?",
+            "opciones": [
+                "a) Un concepto técnico específico del área",
+                "b) Un concepto general no relacionado",
+                "c) Un ejemplo aislado",
+                "d) No hay conceptos claros",
+                "e) No lo sé / Omitir",
+            ],
+            "respuesta_correcta": "a",
+            "nivel_bloom_evaluado": "Recordar",
+        },
+        {
+            "id": 2,
+            "pregunta": "¿Qué objetivo principal se persigue en el material?",
+            "opciones": [
+                "a) Enseñar un proceso o metodología",
+                "b) Presentar datos sin contexto",
+                "c) Listar referencias",
+                "d) No tiene objetivo claro",
+                "e) No lo sé / Omitir",
+            ],
+            "respuesta_correcta": "a",
+            "nivel_bloom_evaluado": "Comprender",
+        },
+        {
+            "id": 3,
+            "pregunta": "¿Cómo aplicarías el concepto principal a un caso real?",
+            "opciones": [
+                "a) Relacionándolo con un proyecto o problema específico",
+                "b) Repitiendo la definición textualmente",
+                "c) Ignorando el contexto de aplicación",
+                "d) No tiene aplicación práctica",
+                "e) No lo sé / Omitir",
+            ],
+            "respuesta_correcta": "a",
+            "nivel_bloom_evaluado": "Aplicar",
+        },
+        {
+            "id": 4,
+            "pregunta": "¿Qué relación existe entre los conceptos clave del material?",
+            "opciones": [
+                "a) Están interconectados formando un sistema",
+                "b) Son conceptos aislados sin relación",
+                "c) Solo se mencionan sin analizar",
+                "d) No hay conceptos clave",
+                "e) No lo sé / Omitir",
+            ],
+            "respuesta_correcta": "a",
+            "nivel_bloom_evaluado": "Analizar",
+        },
+        {
+            "id": 5,
+            "pregunta": "¿Qué limitación o área de mejora identificas en tu comprensión actual?",
+            "opciones": [
+                "a) Necesito más ejemplos prácticos",
+                "b) Comprendo todo perfectamente",
+                "c) No he revisado el material",
+                "d) El material no tiene limitaciones",
+                "e) No lo sé / Omitir",
+            ],
+            "respuesta_correcta": "a",
+            "nivel_bloom_evaluado": "Evaluar",
+        },
+    ]
+
+    return {"EXAMENES": {"EXAMEN_INICIAL": preguntas_base}}
+
+
+def _crear_ruta_minima(usuario):
+    """Genera una ruta mínima con flashcards y exámenes genéricos para no bloquear el flujo."""
+    niveles_base = JERARQUIA_BLOOM[:3]
+    flashcards = {}
+    examenes = {}
+    estado_niveles = {}
+
+    for idx, nivel in enumerate(niveles_base, start=1):
+        flashcards[nivel] = [
+            {
+                "id": 1,
+                "frente": f"Idea clave de {nivel}",
+                "reverso": "Resume con tus palabras la idea principal de tu material.",
+                "visto": False,
+            }
+        ]
+        examenes[nivel] = [
+            {
+                "id": 1,
+                "pregunta": f"Aplica un concepto de {nivel} a tu experiencia diaria.",
+                "opciones": [
+                    "a) Relacionar con un ejemplo propio",
+                    "b) Repetir sin aplicar",
+                ],
+                "respuesta_correcta": "a",
+                "realizado": False,
+            }
+        ]
+        estado_niveles[nivel] = "DISPONIBLE" if idx == 1 else "BLOQUEADO"
+
+    return {
+        "usuario": usuario,
+        "estructura_ruta": {
+            "usuario": usuario,
+            "examenes": examenes,
+            "flashcards": flashcards,
+        },
+        "metadatos_ruta": {
+            "niveles_incluidos": niveles_base,
+            "progreso_global": 0,
+            "estado_niveles": estado_niveles,
+        },
+        "fecha_actualizacion": datetime.datetime.utcnow(),
+        "origen": "fallback_sin_bloom",
+    }
 
 
 # --- INTEGRACIÓN CON SISTEMA ZDP (NUEVO) ---
@@ -446,3 +636,129 @@ def obtener_perfil_estudiante_zdp(usuario):
         "estado": "Sin evaluación realizada",
         "mensaje": "El estudiante aún no ha completado un examen diagnóstico",
     }
+
+
+# --- FUNCIONES NUEVAS PARA REDISEÑO DASHBOARD ---
+
+
+def procesar_multiples_archivos_web(archivos_rutas: list, usuario: str, db) -> tuple:
+    """
+    Procesa múltiples archivos en una operación.
+    
+    Args:
+        archivos_rutas: List[str] - Rutas locales de archivos
+        usuario: str - Usuario propietario
+        db: Database - Instancia MongoDB
+    
+    Returns:
+        Tuple[bool, List[dict], str] - (éxito, resultados por archivo, mensaje)
+        
+    Formato de resultados:
+        [
+            {"nombre": "documento.pdf", "unidades": 10, "estado": "OK", "error": None},
+            {"nombre": "invalido.txt", "unidades": 0, "estado": "ERROR", "error": "..."}
+        ]
+    """
+    resultados = []
+    total_unidades = 0
+    
+    for ruta_archivo in archivos_rutas:
+        try:
+            # Validar que archivo existe
+            if not os.path.exists(ruta_archivo):
+                resultados.append({
+                    "nombre": os.path.basename(ruta_archivo),
+                    "unidades": 0,
+                    "estado": "ERROR",
+                    "error": "Archivo no encontrado"
+                })
+                continue
+            
+            # Procesar archivo
+            ok, msg = procesar_archivo_web(ruta_archivo, usuario, db)
+            
+            if ok:
+                # msg contiene cantidad de unidades procesadas
+                resultados.append({
+                    "nombre": os.path.basename(ruta_archivo),
+                    "unidades": msg,
+                    "estado": "OK",
+                    "error": None
+                })
+                total_unidades += msg
+            else:
+                resultados.append({
+                    "nombre": os.path.basename(ruta_archivo),
+                    "unidades": 0,
+                    "estado": "ERROR",
+                    "error": msg
+                })
+        
+        except Exception as e:
+            logger.error(f"Error procesando {ruta_archivo}: {e}")
+            resultados.append({
+                "nombre": os.path.basename(ruta_archivo),
+                "unidades": 0,
+                "estado": "ERROR",
+                "error": str(e)
+            })
+    
+    # Determinar éxito global
+    exitosos = [r for r in resultados if r["estado"] == "OK"]
+    éxito = len(exitosos) > 0
+    
+    # Mensaje resumen
+    msg_resumen = f"Procesados {len(exitosos)}/{len(archivos_rutas)} archivos ({total_unidades} unidades)"
+    
+    return éxito, resultados, msg_resumen
+
+
+def obtener_rutas_usuario(usuario: str, db) -> list:
+    """
+    Obtiene lista de rutas del usuario con metadata.
+    
+    Args:
+        usuario: str - ID del usuario
+        db: Database - Instancia MongoDB
+    
+    Returns:
+        List[dict] - Rutas ordenadas por fecha_actualizacion DESC
+    """
+    col = db[COLS["RUTAS"]]
+    
+    try:
+        rutas_cursor = col.find(
+            {"usuario": usuario},
+            {
+                "_id": 1,
+                "nombre_ruta": 1,
+                "descripcion": 1,
+                "estado": 1,
+                "progreso_global": 1,
+                "fecha_actualizacion": 1,
+                "archivos_fuente": 1,
+                "metadatos_ruta.niveles_incluidos": 1
+            }
+        ).sort("fecha_actualizacion", -1)
+        
+        rutas_list = []
+        for ruta in rutas_cursor:
+            niveles = ruta.get("metadatos_ruta", {}).get("niveles_incluidos", [])
+            archivos = ruta.get("archivos_fuente", [])
+            
+            rutas_list.append({
+                "ruta_id": str(ruta["_id"]),
+                "nombre_ruta": ruta.get("nombre_ruta", "Sin nombre"),
+                "descripcion": ruta.get("descripcion", ""),
+                "estado": ruta.get("estado", "ACTIVA"),
+                "progreso": ruta.get("progreso_global", 0),
+                "archivos_count": len(archivos),
+                "niveles_completados": len(niveles),
+                "fecha_actualizacion": ruta.get("fecha_actualizacion")
+            })
+        
+        return rutas_list
+    
+    except Exception as e:
+        logger.error(f"Error obteniendo rutas para {usuario}: {e}")
+        return []

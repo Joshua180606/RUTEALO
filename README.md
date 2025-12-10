@@ -34,6 +34,13 @@ Al finalizar el proceso verás en consola el resultado de la ingesta y si un arc
 
 ## 📚 Documentación del Proyecto
 
+### Dashboard (Recientes)
+- **[QUICK_REFERENCE_DASHBOARD_20251210.md](./QUICK_REFERENCE_DASHBOARD_20251210.md)** - Referencia rápida de cambios implementados
+- **[RESUMEN_EJECUTIVO_DASHBOARD_20251210.md](./RESUMEN_EJECUTIVO_DASHBOARD_20251210.md)** - Resumen ejecutivo de mejoras
+- **[GUIA_VISUAL_DASHBOARD_20251210.md](./GUIA_VISUAL_DASHBOARD_20251210.md)** - Mockups y guías visuales
+- **[PLAN_IMPLEMENTACION_DASHBOARD_COMPLETO.md](./PLAN_IMPLEMENTACION_DASHBOARD_COMPLETO.md)** - Plan completo con 10 fases futuras
+- **[UPDATE_DASHBOARD_HEIGHT_200px.md](./UPDATE_DASHBOARD_HEIGHT_200px.md)** - Cambios de altura a 200px
+
 ### Análisis y Optimizaciones
 - **[RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)** - Hallazgos principales, recomendaciones y estado actual
 - **[ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md](./ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md)** - Análisis técnico detallado de cada issue
