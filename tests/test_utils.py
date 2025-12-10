@@ -13,7 +13,10 @@ from src.utils import (
     validate_exam_responses,
     validate_exam_structure,
     safe_get_nested,
-    log_execution_time
+    log_execution_time,
+    minutos_a_horas,
+    horas_a_minutos,
+    formatear_tiempo_estudio
 )
 
 
@@ -254,4 +257,56 @@ class TestExamValidators:
         is_valid, msg = validate_exam_structure(examen)
         assert is_valid is False
         assert "no contiene" in msg.lower()
+
+
+class TestTimeConversions:
+    """Tests para funciones de conversión de tiempo."""
+    
+    def test_minutos_a_horas_120(self):
+        """120 minutos debe ser 2 horas."""
+        assert minutos_a_horas(120) == 2.0
+    
+    def test_minutos_a_horas_90(self):
+        """90 minutos debe ser 1.5 horas."""
+        assert minutos_a_horas(90) == 1.5
+    
+    def test_minutos_a_horas_string(self):
+        """Debe convertir strings a horas."""
+        assert minutos_a_horas("120") == 2.0
+    
+    def test_minutos_a_horas_60(self):
+        """60 minutos debe ser 1 hora."""
+        assert minutos_a_horas(60) == 1.0
+    
+    def test_horas_a_minutos_2(self):
+        """2 horas debe ser 120 minutos."""
+        assert horas_a_minutos(2.0) == 120
+    
+    def test_horas_a_minutos_1_5(self):
+        """1.5 horas debe ser 90 minutos."""
+        assert horas_a_minutos(1.5) == 90
+    
+    def test_horas_a_minutos_string(self):
+        """Debe convertir strings a minutos."""
+        assert horas_a_minutos("2.0") == 120
+    
+    def test_formatear_tiempo_solo_minutos(self):
+        """Debe formatear correctamente solo minutos."""
+        assert formatear_tiempo_estudio(30) == "30 minutos"
+        assert formatear_tiempo_estudio(45) == "45 minutos"
+    
+    def test_formatear_tiempo_solo_horas(self):
+        """Debe formatear correctamente solo horas."""
+        assert formatear_tiempo_estudio(60) == "1 hora"
+        assert formatear_tiempo_estudio(120) == "2 horas"
+    
+    def test_formatear_tiempo_horas_y_minutos(self):
+        """Debe formatear correctamente horas y minutos."""
+        assert formatear_tiempo_estudio(90) == "1 hora 30 minutos"
+        assert formatear_tiempo_estudio(150) == "2 horas 30 minutos"
+    
+    def test_formatear_tiempo_string(self):
+        """Debe funcionar con strings."""
+        assert formatear_tiempo_estudio("120") == "2 horas"
+        assert formatear_tiempo_estudio("90") == "1 hora 30 minutos"
 

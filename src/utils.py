@@ -342,3 +342,63 @@ def validate_exam_structure(examen: dict) -> Tuple[bool, Optional[str]]:
         return False, "El examen no contiene pruebas"
 
     return True, None
+
+
+# ============================================================================
+# UTILIDADES DE TIEMPO Y CONVERSIÓN
+# ============================================================================
+
+
+def minutos_a_horas(minutos: int) -> float:
+    """
+    Convierte minutos a horas.
+
+    Args:
+        minutos: Cantidad de minutos
+
+    Returns:
+        Cantidad de horas como decimal (ej: 120 minutos -> 2.0 horas)
+    """
+    if isinstance(minutos, str):
+        minutos = int(minutos)
+    return minutos / 60
+
+
+def horas_a_minutos(horas: float) -> int:
+    """
+    Convierte horas a minutos.
+
+    Args:
+        horas: Cantidad de horas
+
+    Returns:
+        Cantidad de minutos como entero
+    """
+    if isinstance(horas, str):
+        horas = float(horas)
+    return int(horas * 60)
+
+
+def formatear_tiempo_estudio(minutos: int) -> str:
+    """
+    Formatea tiempo de estudio para presentación.
+
+    Args:
+        minutos: Cantidad de minutos
+
+    Returns:
+        String formateado (ej: "2 horas" o "30 minutos")
+    """
+    if isinstance(minutos, str):
+        minutos = int(minutos)
+
+    horas = minutos // 60
+    mins_restantes = minutos % 60
+
+    if horas == 0:
+        return f"{mins_restantes} minutos"
+    elif mins_restantes == 0:
+        return f"{horas} hora{'s' if horas > 1 else ''}"
+    else:
+        return f"{horas} hora{'s' if horas > 1 else ''} {mins_restantes} minutos"
+

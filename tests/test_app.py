@@ -3,7 +3,7 @@ Tests para src/app.py: rutas Flask y manejo de errores.
 """
 
 import pytest
-from src.app import app, db
+from src.app import app
 
 
 @pytest.fixture
@@ -36,6 +36,21 @@ class TestAppRoutes:
         """GET /register debe retornar 200."""
         response = client.get('/register')
         assert response.status_code == 200
+    
+    def test_register_form_contains_all_fields(self, client):
+        """El formulario de registro debe contener todos los campos necesarios."""
+        response = client.get('/register')
+        content = response.get_data(as_text=True)
+        
+        # Verificar que el formulario contiene todos los campos
+        assert 'nombres' in content
+        assert 'apellidos' in content
+        assert 'email' in content
+        assert 'telefono' in content
+        assert 'tiempo_diario' in content
+        assert 'dia_descanso' in content
+        assert 'password' in content
+        assert 'terms' in content
 
 
 class TestErrorHandling:
@@ -50,3 +65,4 @@ class TestErrorHandling:
         """La app debe inicializarse sin errores."""
         assert app is not None
         assert app.config.get('SECRET_KEY') is not None
+

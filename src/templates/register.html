@@ -1,30 +1,191 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4">Crear Cuenta RUTEALO</h3>
-                <form action="/register" method="POST">
-                    <div class="mb-3">
-                        <label>Nombre Completo</label>
-                        <input type="text" name="nombre" class="form-control" required>
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card shadow-lg">
+            <div class="card-body p-5">
+                <h3 class="text-center mb-4 fw-bold">📚 Crear Cuenta RUTEALO</h3>
+                
+                <form action="/register" method="POST" id="registerForm">
+                    <!-- DATOS PERSONALES -->
+                    <fieldset class="mb-4">
+                        <legend class="fs-5 fw-bold mb-3">📋 Datos Personales</legend>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombres</label>
+                                <input type="text" name="nombres" class="form-control" 
+                                    placeholder="Ej: Joshua Jian" required>
+                                <small class="text-muted">Tu nombre de pila</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Apellidos</label>
+                                <input type="text" name="apellidos" class="form-control" 
+                                    placeholder="Ej: Cora Salazar" required>
+                                <small class="text-muted">Tus apellidos</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" 
+                                placeholder="ejemplo@gmail.com" required>
+                            <small class="text-muted">Usaremos esto para notificaciones</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono</label>
+                            <input type="tel" name="telefono" class="form-control" 
+                                placeholder="999532956" required>
+                            <small class="text-muted">Contacto de emergencia</small>
+                        </div>
+                    </fieldset>
+
+                    <!-- CUENTA Y SEGURIDAD -->
+                    <fieldset class="mb-4">
+                        <legend class="fs-5 fw-bold mb-3">🔐 Cuenta y Seguridad</legend>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Usuario (ID único)</label>
+                            <input type="text" name="usuario" class="form-control" 
+                                placeholder="tu_usuario_123" required>
+                            <small class="text-muted">Entre 3 y 50 caracteres, letras y números</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Contraseña</label>
+                            <input type="password" name="password" class="form-control" 
+                                id="password" placeholder="••••••••" required>
+                            <small class="text-muted">
+                                Mínimo 8 caracteres, mayúscula, minúscula, número
+                            </small>
+                            <div class="mt-2">
+                                <small id="passwordStrength" class="d-block"></small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Confirmar Contraseña</label>
+                            <input type="password" name="password_confirm" class="form-control" 
+                                id="password_confirm" placeholder="••••••••" required>
+                            <small id="passwordMatch" class="d-block"></small>
+                        </div>
+                    </fieldset>
+
+                    <!-- PREFERENCIAS DE ESTUDIO -->
+                    <fieldset class="mb-4">
+                        <legend class="fs-5 fw-bold mb-3">⏱️ Preferencias de Estudio</legend>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Tiempo disponible diariamente (minutos)</label>
+                            <input type="number" name="tiempo_diario" class="form-control" 
+                                placeholder="120" min="15" max="480" required>
+                            <small class="text-muted">
+                                Cuántos minutos puedes dedicar al estudio por día (15-480 min)
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Día de descanso semanal</label>
+                            <select name="dia_descanso" class="form-control" required>
+                                <option value="">-- Selecciona un día --</option>
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes">Martes</option>
+                                <option value="Miércoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sábado">Sábado</option>
+                                <option value="Domingo">Domingo</option>
+                            </select>
+                            <small class="text-muted">No recibirás estudios este día</small>
+                        </div>
+                    </fieldset>
+
+                    <!-- TÉRMINOS -->
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="terms" 
+                                name="terms" required>
+                            <label class="form-check-label" for="terms">
+                                Acepto los términos y condiciones de RUTEALO
+                            </label>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label>Usuario (ID único)</label>
-                        <input type="text" name="usuario" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Contraseña</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100">Registrarse</button>
+
+                    <!-- BOTONES -->
+                    <button type="submit" class="btn btn-success btn-lg w-100 mb-2">
+                        ✓ Crear Cuenta
+                    </button>
                 </form>
+
                 <div class="mt-3 text-center">
-                    <a href="/login">Ya tengo cuenta</a>
+                    <small>¿Ya tienes cuenta? 
+                        <a href="/login" class="fw-bold text-success">Inicia sesión</a>
+                    </small>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Script para validar contraseña en tiempo real -->
+<script>
+document.getElementById('password').addEventListener('input', function() {
+    const password = this.value;
+    const strength = document.getElementById('passwordStrength');
+    
+    let hasUpper = /[A-Z]/.test(password);
+    let hasLower = /[a-z]/.test(password);
+    let hasNumber = /[0-9]/.test(password);
+    let isLongEnough = password.length >= 8;
+    
+    if (isLongEnough && hasUpper && hasLower && hasNumber) {
+        strength.className = 'text-success';
+        strength.textContent = '✓ Contraseña fuerte';
+    } else {
+        strength.className = 'text-warning';
+        strength.textContent = '⚠ Contraseña débil: ' + 
+            (!hasUpper ? 'sin mayúscula ' : '') +
+            (!hasLower ? 'sin minúscula ' : '') +
+            (!hasNumber ? 'sin número ' : '') +
+            (!isLongEnough ? '(mín 8 caracteres)' : '');
+    }
+});
+
+document.getElementById('password_confirm').addEventListener('input', function() {
+    const password = document.getElementById('password').value;
+    const confirm = this.value;
+    const match = document.getElementById('passwordMatch');
+    
+    if (confirm === '') {
+        match.textContent = '';
+        match.className = '';
+    } else if (password === confirm) {
+        match.className = 'text-success';
+        match.textContent = '✓ Las contraseñas coinciden';
+    } else {
+        match.className = 'text-danger';
+        match.textContent = '✗ Las contraseñas no coinciden';
+    }
+});
+</script>
+
+<style>
+    fieldset {
+        border: 1px solid #e0e0e0;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        background-color: #f9f9f9;
+    }
+    
+    legend {
+        padding: 0 0.5rem;
+        color: #333;
+    }
+    
+    .card {
+        border: 2px solid #28a745;
+        border-radius: 1rem;
+    }
+</style>
 {% endblock %}

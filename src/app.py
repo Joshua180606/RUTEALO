@@ -46,9 +46,26 @@ def index():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
+        # Obtener datos personales
         usuario = request.form.get("usuario", "").strip()
         password = request.form.get("password", "").strip()
-        nombre = request.form.get("nombre", "").strip()
+        password_confirm = request.form.get("password_confirm", "").strip()
+        nombres = request.form.get("nombres", "").strip()
+        apellidos = request.form.get("apellidos", "").strip()
+        email = request.form.get("email", "").strip()
+        telefono = request.form.get("telefono", "").strip()
+        
+        # Obtener preferencias
+        tiempo_diario = request.form.get("tiempo_diario", "").strip()
+        dia_descanso = request.form.get("dia_descanso", "").strip()
+        
+        # Validar términos
+        terms = request.form.get("terms")
+
+        # VALIDACIONES
+        if not terms:
+            flash("Debes aceptar los términos y condiciones", "danger")
+            return redirect(url_for("register"))
 
         # Validar username
         if not validate_username(usuario):
@@ -63,37 +80,87 @@ def register():
             logger.warning(f"Weak password attempt for user: {usuario}")
             return redirect(url_for("register"))
 
-        # Validar nombre no vacío
-        if not nombre:
-            flash("El nombre es requerido", "danger")
+        # Validar que las contraseñas coinciden
+        if password != password_confirm:
+            flash("Las contraseñas no coinciden", "danger")
             return redirect(url_for("register"))
 
-        # Verificar si existe
+        # Validar datos personales
+        if not nombres or not apellidos:
+            flash("Nombres y apellidos son requeridos", "danger")
+            return redirect(url_for("register"))
+
+        if not email or "@" not in email:
+            flash("Correo electrónico válido es requerido", "danger")
+            return redirect(url_for("register"))
+
+        if not telefono or not telefono.isdigit() or len(telefono) < 7:
+            flash("Teléfono válido es requerido (mínimo 7 dígitos)", "danger")
+            return redirect(url_for("register"))
+
+        # Validar tiempo diario
+        try:
+            tiempo_diario_int = int(tiempo_diario)
+            if tiempo_diario_int < 15 or tiempo_diario_int > 480:
+                flash("Tiempo diario debe estar entre 15 y 480 minutos", "danger")
+                return redirect(url_for("register"))
+        except ValueError:
+            flash("Tiempo diario debe ser un número válido", "danger")
+            return redirect(url_for("register"))
+
+        if not dia_descanso:
+            flash("Debe seleccionar un día de descanso", "danger")
+            return redirect(url_for("register"))
+
+        # Verificar si el usuario ya existe
         if db[COLS["PERFIL"]].find_one({"usuario": usuario}):
             flash("El usuario ya existe", "danger")
             logger.warning(f"Registration attempt with existing user: {usuario}")
             return redirect(url_for("register"))
 
-        # Crear usuario con password hasheado
+        # Verificar si el email ya existe
+        if db[COLS["PERFIL"]].find_one({"datos_personales.email": email}):
+            flash("Este correo ya está registrado", "danger")
+            logger.warning(f"Registration attempt with existing email: {email}")
+            return redirect(url_for("register"))
+
+        # Crear usuario con todos los datos
         try:
+            from datetime import datetime, timezone
+            
             hashed_pw = generate_password_hash(password)
-            db[COLS["PERFIL"]].insert_one(
-                {
-                    "usuario": usuario,
-                    "password": hashed_pw,
-                    "datos_personales": {"nombres": nombre},
-                    "archivos_subidos": 0,
-                }
-            )
+            
+            user_doc = {
+                "usuario": usuario,
+                "password": hashed_pw,
+                "datos_personales": {
+                    "nombres": nombres,
+                    "apellidos": apellidos,
+                    "email": email,
+                    "telefono": telefono,
+                },
+                "preferencias": {
+                    "tiempo_diario": str(tiempo_diario_int),  # En minutos como string (convertible a horas)
+                    "dia_descanso": dia_descanso,
+                    "nivel_actual_bloom": "No iniciado",
+                    "ultima_actualizacion": datetime.now(timezone.utc),
+                },
+                "archivos_subidos": 0,
+                "fecha_registro": datetime.now(timezone.utc),
+            }
+            
+            db[COLS["PERFIL"]].insert_one(user_doc)
             flash("Registro exitoso. Por favor inicia sesión.", "success")
-            logger.info(f"User registered successfully: {usuario}")
+            logger.info(f"User registered successfully: {usuario} ({email})")
             return redirect(url_for("login"))
+            
         except Exception as e:
             flash("Error durante el registro. Intenta de nuevo.", "danger")
             logger.error(f"Registration error for {usuario}: {str(e)}")
             return redirect(url_for("register"))
 
     return render_template("register.html")
+
 
 
 @app.route("/login", methods=["GET", "POST"])
