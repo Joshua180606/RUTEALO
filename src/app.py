@@ -1,7 +1,13 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import BadRequest
+
+# Nota: Para ejecutar la aplicación localmente usa la forma de módulo
+# recomendada (por ejemplo `python -m src.app`) o `flask run`.
+# No se incluye aquí un parche runtime que modifique `sys.path`.
+
 from src.config import COLS, RAW_DIR, SECRET_KEY, DEBUG
 from src.logging_config import setup_logging, get_logger
 from src.database import get_database_connection
@@ -31,6 +37,65 @@ except Exception as e:
 
 db = get_db()
 
+
+@app.route("/dump", methods=["GET", "POST"])
+def dump_request():
+    """Temporary debug endpoint to inspect incoming requests.
+    - GET returns a short help message.
+    - POST returns headers and form keys (password fields filtered).
+    Use only for debugging; remove after diagnosis.
+    """
+    try:
+        if request.method == "POST":
+            # safe inspection: don't echo password values
+            keys = list(request.form.keys()) if request.form else []
+            filtered = [k for k in keys if k.lower() not in ("password", "password_confirm")]
+            headers = {k: v for k, v in request.headers.items()}
+            return jsonify({
+                "method": "POST",
+                "form_keys": filtered,
+                "content_type": request.content_type,
+                "content_length": request.content_length,
+                "headers": headers,
+            }), 200
+
+        return jsonify({"message": "Dump endpoint active. POST form data to inspect keys."}), 200
+    except Exception as e:
+        logger.error(f"Error in /dump endpoint: {e}")
+        return jsonify({"error": "internal"}), 500
+
+
+
+@app.errorhandler(BadRequest)
+def log_bad_request(e):
+    """Log details about requests that caused a BadRequest before view handling.
+    Helps debug malformed or rejected requests (without logging sensitive body data).
+    """
+    try:
+        logger.error("BadRequest exception caught: %s", e)
+        # Log useful request metadata (headers/cookies/content info) safely
+        try:
+            headers = {k: v for k, v in request.headers.items()}
+            logger.error("Request headers: %s", headers)
+        except Exception as _:
+            logger.error("Could not read request headers")
+
+        try:
+            logger.error("Request cookies: %s", dict(request.cookies))
+        except Exception:
+            logger.error("Could not read request cookies")
+
+        try:
+            logger.error("Content-Type=%s Content-Length=%s", request.content_type, request.content_length)
+        except Exception:
+            logger.error("Could not read content metadata")
+
+    except Exception as ex:
+        logger.error("Error while logging BadRequest info: %s", ex)
+
+    # Return a simple response; the user already sees 'Bad Request' in the browser.
+    return "Bad Request", 400
+
 # --- RUTAS DE AUTENTICACIÓN Y PÁGINAS ---
 
 
@@ -46,6 +111,16 @@ def index():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
+        # Debug: registrar metadatos de la request para diagnosticar 'Bad Request'
+        try:
+            logger.debug(f"Register POST content_type={request.content_type} content_length={request.content_length}")
+            # Mostrar las claves recibidas, sin incluir campos de contraseña
+            keys = list(request.form.keys()) if request.form else []
+            filtered = [k for k in keys if k not in ("password", "password_confirm")]
+            logger.debug(f"Register POST form keys (sin password): {filtered}")
+        except Exception:
+            logger.debug("Error al intentar leer metadatos de la request de registro")
+
         # Obtener datos personales
         usuario = request.form.get("usuario", "").strip()
         password = request.form.get("password", "").strip()
@@ -339,17 +414,28 @@ def download_file(archivo):
 
 @app.teardown_appcontext
 def shutdown_database(exception=None):
-    """Close database connection on app shutdown."""
-    try:
-        db_connection.close()
-        logger.info("Database connection closed")
-    except Exception as e:
-        logger.error(f"Error closing database: {str(e)}")
+    """
+    Note: We do NOT close the database connection here.
+    The singleton DatabaseConnection is designed to persist across requests
+    and handle reconnection if the connection drops.
+    Connection will be closed when the app process itself terminates.
+    """
+    pass
 
 
 if __name__ == "__main__":
+    # Compute host/port from environment or defaults so we can print the URL explicitly.
+    host = os.getenv("FLASK_RUN_HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", os.getenv("FLASK_RUN_PORT", "5000")))
+
+    url = f"http://{host}:{port}"
+    # Log and print the URL so it's visible in the terminal (helps when Flask's built-in message is not shown).
+    logger.info(f"App will be available at {url}")
+    # Also print to stdout to make it obvious in simple terminals
+    print(f"==> RUTEALO running at {url} (CTRL+C to stop)")
+
     try:
-        app.run(debug=DEBUG, port=5000)
+        app.run(debug=DEBUG, port=port, host=host)
     except KeyboardInterrupt:
         logger.info("App interrupted by user")
     except Exception as e:

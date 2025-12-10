@@ -71,10 +71,10 @@ class DatabaseConnection:
 
             # Verify connection with health check
             self._health_check()
-            logger.info("✅ Conexión a MongoDB establecida correctamente")
+            logger.info("Conexion a MongoDB establecida correctamente")
 
         except Exception as e:
-            logger.error(f"❌ Error al conectar a MongoDB: {str(e)}")
+            logger.error(f"Error al conectar a MongoDB: {str(e)}")
             self._client = None
             raise
 

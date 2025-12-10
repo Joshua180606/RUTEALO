@@ -76,3 +76,44 @@ Para preguntas sobre:
 - **Arquitectura pedagógica:** Ver `SISTEMA_ZDP_DOCUMENTACION.md`
 - **Code quality:** Ver `ANALISIS_INCONGRUENCIAS_Y_OPTIMIZACIONES.md`
 - **Implementación:** Ver `PLAN_IMPLEMENTACION_OPTIMIZACIONES.md`
+ 
+---
+
+## Ejecutar la aplicación (Recomendado)
+
+Para ejecutar la aplicación web localmente se recomienda iniciar el intérprete como módulo desde la raíz del proyecto o usar `flask run`.
+
+- PowerShell (recomendado):
+
+```powershell
+# Activar el virtualenv creado con el instalador
+.\.venv\Scripts\Activate.ps1
+
+# Ejecutar como módulo (mantiene la importación de paquetes)
+python -m src.app
+```
+
+- Alternativa con Flask CLI (PowerShell):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+# $env:FLASK_APP = 'src.app'  # opcional para flask CLI
+# $env:FLASK_ENV = 'development'
+flask run --port 5000
+```
+
+- Windows CMD:
+
+```bat
+\.venv\Scripts\activate.bat
+python -m src.app
+```
+
+Nota: Evita ejecutar `python src/app.py` directamente desde la carpeta `src/`, ya que Python no añade automáticamente la raíz del proyecto a `sys.path` y eso puede provocar errores de importación. Se eliminó el parche que modificaba `sys.path` en tiempo de ejecución para mantener un comportamiento predecible y más seguro.
+
+Comprobar tests:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pytest -q
+```

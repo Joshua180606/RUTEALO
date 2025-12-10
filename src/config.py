@@ -44,7 +44,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 # --- FLASK ---
 SECRET_KEY = os.getenv("SECRET_KEY", "RUTEALO_SECRET_KEY_SUPER_SECRETA")
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 # --- UPLOAD CONFIG ---
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
