@@ -1114,7 +1114,7 @@ def transcribir_audio():
         openai_key = os.getenv('OPENAI_API_KEY')
         if not openai_key:
             return jsonify({
-                "error": "OPENAI_API_KEY no configurada. Agrega tu clave en claves.env"
+                "error": "OPENAI_API_KEY no configurada."
             }), 500
         
         # Transcribir con Whisper
