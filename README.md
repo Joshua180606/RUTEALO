@@ -845,30 +845,6 @@ Balance entre desafío y habilidad para lograr estado de flujo óptimo:
 
 ---
 
-## 🚀 Roadmap
-
-- [x] Sistema de evaluación ZDP con scoring por nivel Bloom
-- [x] Integración con Gemini AI (4 claves especializadas)
-- [x] Clasificación automática de contenido según Bloom
-- [x] Generadores pedagógicos con teoría enriquecida
-- [x] Chatbot tutor multilingüe (ES/EN/QU)
-- [x] Transcripción de audio con Whisper
-- [x] Dashboard web con modales enriquecidos
-- [x] Logging estructurado con rotación
-- [x] Tests automatizados (50+ tests unitarios)
-- [x] Connection pooling de MongoDB
-- [x] Optimización de tokens (40% reducción)
-- [ ] Caché de respuestas de IA
-- [ ] Análisis de progreso con gráficos
-- [ ] Gamificación (logros, rankings)
-- [ ] Exportación de rutas a PDF
-- [ ] Notificaciones de estudio (email/SMS)
-- [ ] App móvil (Flutter/React Native)
-- [ ] CI/CD con GitHub Actions
-- [ ] Despliegue en cloud (AWS/Azure/GCP)
-
----
-
 ## 📄 Licencia
 
 Este proyecto es parte de una tesis académica. Todos los derechos reservados.
@@ -877,7 +853,12 @@ Este proyecto es parte de una tesis académica. Todos los derechos reservados.
 
 ## 👨‍💻 Autor
 
-**Joshua** - Tesis de Grado
+**Joshua Cora** - Tesis de Grado
+- 📧 Email: (Configurar en perfil)
+- 🎓 Universidad: (Configurar)
+- 📅 Fecha: Diciembre 2025
+
+**Kevin Olortegui** - Tesis de Grado
 - 📧 Email: (Configurar en perfil)
 - 🎓 Universidad: (Configurar)
 - 📅 Fecha: Diciembre 2025
